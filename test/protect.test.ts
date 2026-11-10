@@ -37,3 +37,25 @@ describe("protected preamble", () => {
     expect(revertsOutsideBody("just text", [{ rangeOffset: 0, rangeLength: 0, text: "a" }])).toEqual([]);
   });
 });
+
+import { cutsHidden, mergeRanges, snapOffset } from "../src/preview/protect";
+
+describe("hidden code", () => {
+  const hidden = mergeRanges([[10, 18], [18, 19], [30, 31]]);
+  it("joins touching ranges", () => {
+    expect(hidden).toEqual([[10, 19], [30, 31]]);
+  });
+  it("moves a cursor out of hidden code the way it was going", () => {
+    expect(snapOffset(12, 10, hidden)).toBe(19);
+    expect(snapOffset(12, 19, hidden)).toBe(10);
+    expect(snapOffset(10, 9, hidden)).toBe(10);
+    expect(snapOffset(25, 24, hidden)).toBe(25);
+  });
+  it("refuses edits that cut into hidden code, allows whole removal and edits beside it", () => {
+    expect(cutsHidden({ rangeOffset: 18, rangeLength: 1, text: "" }, hidden)).toBe(true); // backspace after it
+    expect(cutsHidden({ rangeOffset: 12, rangeLength: 0, text: "x" }, hidden)).toBe(true);
+    expect(cutsHidden({ rangeOffset: 19, rangeLength: 0, text: "x" }, hidden)).toBe(false);
+    expect(cutsHidden({ rangeOffset: 5, rangeLength: 20, text: "" }, hidden)).toBe(false);
+    expect(cutsHidden({ rangeOffset: 20, rangeLength: 3, text: "" }, hidden)).toBe(false);
+  });
+});

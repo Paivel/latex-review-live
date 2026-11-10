@@ -32,12 +32,12 @@ describe("live preview", () => {
 
   it("turns headings, lists and quotes into text", () => {
     const src = "\\section{Intro}\n\\begin{itemize}\n\\item one\n\\item two\n\\end{itemize}\n\\begin{enumerate}\n\\item a\n\\item b\n\\end{enumerate}\n``q'' -- x --- y";
-    expect(look(src)).toBe("Intro\n\n• one\n• two\n\n\n1. a\n2. b\n\n“q” – x — y");
+    expect(look(src)).toBe("Intro\n\\begin{itemize}\n• one\n• two\n\\end{itemize}\n\\begin{enumerate}\n1. a\n2. b\n\\end{enumerate}\n“q” – x — y");
   });
 
   it("leaves the preamble as source", () => {
     const src = "\\documentclass{article}\n\\usepackage{x}\n\\begin{document}\n\\textbf{a}\n\\end{document}";
-    expect(look(src)).toBe("\\documentclass{article}\n\\usepackage{x}\n\na\n");
+    expect(look(src)).toBe("\\documentclass{article}\n\\usepackage{x}\n\\begin{document}\na\n\\end{document}");
   });
 
   it("shows references and citations from the .aux", () => {
@@ -69,9 +69,9 @@ describe("live preview", () => {
     expect(look("Fig.~1\\\\next")).toBe("Fig.\u00a01 ↵next");
   });
 
-  it("figures become a short marker", () => {
+  it("keeps \\begin and \\end of figures in view", () => {
     const src = "\\begin{figure}[h]\n\\centering\n\\includegraphics[width=3cm]{figures/scheme}\n\\caption{A scheme}\\label{fig:s}\n\\end{figure}";
-    expect(look(src)).toBe("▣ Figure\n\\centering\n🖼 figures/scheme\nCaption: A scheme\n");
+    expect(look(src)).toBe("\\begin{figure}[h]\n\\centering\n🖼 figures/scheme\nCaption: A scheme\n\\end{figure}");
   });
 
   it("does not hang on broken input", () => {

@@ -532,11 +532,17 @@ class Parser {
     return ne;
   }
 
+  /** \begin{…} and \end{…} stay visible, dimmed, so the structure of the text is always in view. */
   private environment(i: number, kind: "begin" | "end", after: number, to: number): number {
     const g = this.group(after);
     if (!g) return after;
     const env = this.inner(g).trim();
-    const owner: [number, number] = [i, g.end];
+    let e = g.end;
+    if (kind === "begin") {
+      const o = this.optional(e);
+      if (o && (LISTS.test(env) || env in FLOATS)) e = o.end;
+    }
+    const owner: [number, number] = [i, e];
 
     if (kind === "begin" && MATH_ENVS.test(env)) {
       const k = this.findEnd(env, g.end);
@@ -544,8 +550,8 @@ class Parser {
       const endG = this.group(k + 4);
       const stop = endG ? endG.end : k;
       const all: [number, number] = [i, stop];
-      this.style(i, g.end, "muted", all, true);
-      this.style(k, stop, "muted", all, true);
+      this.style(i, g.end, "muted", all);
+      this.style(k, stop, "muted", all);
       this.style(g.end, k, "math", all);
       this.math(g.end, k, all);
       return stop;
@@ -554,50 +560,21 @@ class Parser {
     if (LISTS.test(env)) {
       if (kind === "begin") this.lists.push({ kind: env, n: 0 });
       else this.lists.pop();
-      let e = g.end;
-      if (kind === "begin") {
-        const o = this.optional(e);
-        if (o) e = o.end;
-      }
-      this.hide(i, e, [i, e]);
-      return e;
     }
 
-    if (env in FLOATS) {
-      let e = g.end;
-      if (kind === "begin") {
-        const o = this.optional(e);
-        if (o) e = o.end;
-        this.replace(i, e, `▣ ${FLOATS[env]}`, [i, e], "muted");
-      } else {
-        this.hide(i, e, [i, e]);
-      }
-      return e;
-    }
-
-    if (env === "abstract") {
-      if (kind === "begin") this.replace(i, g.end, "Abstract", owner, "heading2");
-      else this.hide(i, g.end, owner);
-      return g.end;
-    }
-
-    if (QUIET_ENVS.test(env)) {
-      this.hide(i, g.end, owner);
-      return g.end;
-    }
-
-    if (env === "verbatim" || env === "lstlisting" || env === "minted" || env === "comment") {
-      if (kind !== "begin") return g.end;
+    if (kind === "begin" && (env === "verbatim" || env === "lstlisting" || env === "minted" || env === "comment")) {
       const k = this.findEnd(env, g.end);
       if (k < 0) return g.end;
       const endG = this.group(k + 4);
       const stop = endG ? endG.end : k;
+      this.style(i, g.end, "muted", [i, stop]);
       this.style(g.end, k, env === "comment" ? "muted" : "code", [i, stop], env === "comment");
+      this.style(k, stop, "muted", [i, stop]);
       return stop;
     }
 
-    this.style(i, g.end, "muted", owner, true);
-    return g.end;
+    this.style(i, e, env === "abstract" && kind === "begin" ? "heading2" : "muted", owner);
+    return e;
   }
 
   // ---------------------------------------------------------------- math mode

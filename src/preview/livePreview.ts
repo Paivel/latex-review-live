@@ -3,7 +3,7 @@ import * as path from "path";
 import { Piece, Refs, Style, noRefs, parseLatex } from "./parse";
 import { readAux } from "./aux";
 import { codeRuns, lineKinds } from "./fold";
-import { revertsOutsideBody } from "./protect";
+import { cutsHidden, mergeRanges, revertsOutsideBody, revertsWhere, snapOffset } from "./protect";
 import { isOwnEdit } from "../own-edits";
 
 const isTex = (doc: vscode.TextDocument) => doc.languageId === "latex" || doc.languageId === "tex";
@@ -66,6 +66,9 @@ export class LivePreview implements vscode.Disposable {
   private ownEdit = new Map<string, number>();
   /** Selections of each live document before the latest change, as offsets: where the user types. */
   private cursors = new Map<string, [number, number][]>();
+  /** Code hidden in each live document as last painted (merged offset ranges). */
+  private hiddenNow = new Map<string, [number, number][]>();
+  private snapping = false;
   private folding = false;
 
   constructor(private state: vscode.Memento) {
@@ -95,6 +98,7 @@ export class LivePreview implements vscode.Disposable {
       vscode.window.onDidChangeActiveTextEditor(() => this.updateStatus()),
       vscode.window.onDidChangeTextEditorSelection((e) => {
         if (this.folding || !this.isOn(e.textEditor.document)) return;
+        if (e.kind !== vscode.TextEditorSelectionChangeKind.Mouse && !this.snapping && this.snap(e.textEditor)) return;
         this.rememberCursors(e.textEditor);
         this.lastSelection = Date.now();
         clearTimeout(this.mouseTimer);
@@ -230,7 +234,10 @@ export class LivePreview implements vscode.Disposable {
       if (mode === "line") return [doc.offsetAt(doc.lineAt(s.start.line).range.start), doc.offsetAt(doc.lineAt(s.end.line).range.end)];
       return [doc.offsetAt(s.start), doc.offsetAt(s.end)];
     });
-    const revealed = (p: Piece) => mode !== "never" && sel.some(([a, b]) => p.owner[0] <= b && p.owner[1] >= a);
+    // Like Obsidian: the code of the element the cursor is inside shows; at its edges it stays hidden,
+    // and the cursor steps over hidden code in one go (see snap).
+    const revealed = (p: Piece) =>
+      mode === "line" ? sel.some(([a, b]) => p.owner[0] <= b && p.owner[1] >= a) : mode !== "never" && sel.some(([a, b]) => p.owner[0] < b && p.owner[1] > a || (a === b && p.owner[0] < a && a < p.owner[1]));
 
     const hidden: vscode.DecorationOptions[] = [];
     const styled = new Map<Style, vscode.Range[]>();
@@ -248,6 +255,7 @@ export class LivePreview implements vscode.Disposable {
       }
     }
     ed.setDecorations(this.hideType, hidden);
+    this.hiddenNow.set(doc.uri.toString(), mergeRanges(hidden.map((o) => [doc.offsetAt(o.range.start), doc.offsetAt(o.range.end)])));
     for (const [s, t] of this.styleTypes) ed.setDecorations(t, styled.get(s) ?? []);
     if (ed === vscode.window.activeTextEditor) this.scheduleFold(ed);
   }
@@ -271,7 +279,13 @@ export class LivePreview implements vscode.Disposable {
     const at = this.cursors.get(k) ?? [];
     // Typing and pasting happen at a cursor; an edit elsewhere is another extension's.
     const byUser = (c: { rangeOffset: number; rangeLength: number }) => at.some(([a, b]) => c.rangeOffset <= b && c.rangeOffset + c.rangeLength >= a);
-    const reverts = revertsOutsideBody(before, e.contentChanges, byUser);
+    let reverts = revertsOutsideBody(before, e.contentChanges, byUser);
+    let what = "The preamble and what follows \\end{document} are read-only in live preview. Switch to Source to edit them.";
+    if (reverts.length === 0) {
+      const hidden = this.hiddenNow.get(k) ?? [];
+      reverts = revertsWhere(before, e.contentChanges, (c) => byUser(c) && cutsHidden(c, hidden));
+      what = "Hidden LaTeX code is not edited in live preview. Put the cursor inside the command to see it, or switch to Source.";
+    }
     if (reverts.length === 0) return;
     const edit = new vscode.WorkspaceEdit();
     for (const r of reverts) edit.replace(doc.uri, new vscode.Range(doc.positionAt(r.start), doc.positionAt(r.end)), r.text);
@@ -279,7 +293,33 @@ export class LivePreview implements vscode.Disposable {
     void vscode.workspace.applyEdit(edit).then((ok) => {
       if (!ok) this.ownEdit.delete(k);
     });
-    vscode.window.setStatusBarMessage("$(lock) The preamble and what follows \\end{document} are read-only in live preview. Switch to Source to edit them.", 4000);
+    vscode.window.setStatusBarMessage("$(lock) " + what, 4000);
+  }
+
+  /**
+   * Keep the cursor out of hidden code, as CodeMirror's atomic ranges do in
+   * Obsidian: an arrow key that would step into it jumps over it. True if moved.
+   */
+  private snap(ed: vscode.TextEditor): boolean {
+    const doc = ed.document;
+    const hidden = this.hiddenNow.get(doc.uri.toString());
+    if (!hidden || hidden.length === 0) return false;
+    const before = this.cursors.get(doc.uri.toString()) ?? [];
+    let moved = false;
+    const next = ed.selections.map((s, i) => {
+      if (!s.isEmpty) return s;
+      const off = doc.offsetAt(s.active);
+      const to = snapOffset(off, before[i]?.[0], hidden);
+      if (to === off) return s;
+      moved = true;
+      const p = doc.positionAt(to);
+      return new vscode.Selection(p, p);
+    });
+    if (!moved) return false;
+    this.snapping = true;
+    ed.selections = next;
+    setTimeout(() => (this.snapping = false), 0);
+    return true;
   }
 
   private rememberCursors(ed: vscode.TextEditor) {

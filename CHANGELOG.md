@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.5
+
+- Live preview: \\begin{…} and \\end{…} always stay in view (dimmed).
+- Live preview: the cursor steps over hidden code in one go and typing or deleting can no longer cut into it, as with Obsidian's atomic ranges. The code of the command the cursor is inside still shows.
+
 ## 0.1.4
 
 - Review pane on the right: each change as a card with green Accept and red Reject; the change at the cursor is outlined.

@@ -35,14 +35,15 @@ Click **Source** in the status bar, the eye button in the editor title, or press
 | `$\alpha \to \beta^2$`, `\frac{a}{b}` | α → β², a/b |
 | `\ce{SO4^2-}`, `\SI{5}{\milli\gram\per\milli\litre}` | SO₄²⁻, 5 mg/mL |
 | `\item`, `` ``q'' ``, `--`, `~`, `\%` | •, “q”, –, non-breaking space, % |
+| `\begin{figure}`, `\end{itemize}` | shown as they are, dimmed |
 | `\footnote{…}`, `\label{…}` | [ … ] dimmed, hidden |
-| `\begin{figure}…\includegraphics{s}…\caption{…}` | ▣ Figure, 🖼 s, Caption: … |
+| `\includegraphics{s}`, `\caption{…}` | 🖼 s, Caption: … |
 
 Lines that hold only code (`\label`, `\begin{itemize}`, `\centering`, comments, the preamble) are folded away; the line the cursor is on always stays open. Turn this off with `latexReview.livePreview.foldCode`.
 
 The preamble and anything after `\end{document}` are read-only in live preview (`latexReview.livePreview.protectPreamble`); switch to Source to edit them.
 
-The code of the command under the cursor is shown while you edit it, as in Obsidian. `latexReview.livePreview.reveal` switches this to the whole line, or off. The preamble and commands it does not know are left as source. Display math is coloured and its symbols replaced, but it is not typeset.
+The code of the command the cursor is inside is shown while you edit it, as in Obsidian. Elsewhere the cursor steps over hidden code in one go, and typing or deleting cannot cut into it. `latexReview.livePreview.reveal` switches this to the whole line, or off. The preamble and commands it does not know are left as source. Display math is coloured and its symbols replaced, but it is not typeset.
 
 ## Settings
 
