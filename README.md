@@ -14,7 +14,7 @@ Click **Track changes** in the status bar (or run *LaTeX Review: Start Tracking 
 - inserted text is blue and underlined, deleted text is shown in red, struck through, where it was;
 - a mark in the left margin shows each changed line (green: added, red: deleted, orange: rewritten);
 - **Accept / Reject** above each changed line;
-- the **Review** pane on the right (the secondary side bar) shows every change as a card with a green **Accept** and a red **Reject**, plus Accept All and Reject All; the change at the cursor is outlined, and clicking a card jumps to it;
+- the **Review** pane (its icon in the activity bar; drag it to the right side bar to keep it beside the text) shows every change as a card with a green **Accept** and a red **Reject**, plus Accept All and Reject All; the change at the cursor is outlined, and clicking a card jumps to it;
 - each change also has Accept / Reject in its hover and in the lightbulb (`Ctrl+.` / `Cmd+.`); select a passage to accept or reject all changes in it.
 - `Ctrl+Alt+]` / `Ctrl+Alt+[` (`Cmd+Alt+]` / `Cmd+Alt+[` on Mac) go to the next or previous change.
 

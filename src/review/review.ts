@@ -246,7 +246,7 @@ export class TrackChanges implements vscode.Disposable {
       }),
       vscode.languages.registerHoverProvider(sel, { provideHover: (doc, pos) => this.hover(doc, pos) }),
       vscode.languages.registerCodeActionsProvider(sel, { provideCodeActions: (doc, range) => this.actions(doc, range) }),
-      vscode.window.registerWebviewViewProvider("latexReview.changes", this.pane, { webviewOptions: { retainContextWhenHidden: true } }),
+      vscode.window.registerWebviewViewProvider("latexReview.pane", this.pane, { webviewOptions: { retainContextWhenHidden: true } }),
       this.treeChanged.event(() => this.updatePane()),
       vscode.window.onDidChangeTextEditorSelection((e) => e.textEditor === vscode.window.activeTextEditor && this.updatePane()),
       vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration("latexReview.codeLens") && this.codeLensChanged.fire()),
@@ -354,7 +354,7 @@ export class TrackChanges implements vscode.Disposable {
     r.data.trackingSince = new Date().toISOString();
     this.store.recompute(r, ed.document);
     await this.store.persist(r, ed.document);
-    void vscode.commands.executeCommand("latexReview.changes.focus").then(undefined, () => undefined);
+    void vscode.commands.executeCommand("latexReview.pane.focus").then(undefined, () => undefined);
     void vscode.window.showTextDocument(ed.document, ed.viewColumn);
   }
 

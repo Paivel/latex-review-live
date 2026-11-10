@@ -2,7 +2,7 @@
   "name": "latex-review-live",
   "displayName": "LaTeX Review and Live Preview",
   "description": "Track changes with accept/reject, review comments, and an Obsidian-style live preview that hides LaTeX code while you edit.",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
@@ -190,19 +190,19 @@
       }
     ],
     "viewsContainers": {
-      "secondarySidebar": [
+      "activitybar": [
         {
-          "id": "latexReview",
-          "title": "Review",
+          "id": "latexReviewPane",
+          "title": "LaTeX Review",
           "icon": "$(git-pull-request)"
         }
       ]
     },
     "views": {
-      "latexReview": [
+      "latexReviewPane": [
         {
-          "id": "latexReview.changes",
-          "name": "Changes",
+          "id": "latexReview.pane",
+          "name": "Review",
           "type": "webview"
         }
       ]
@@ -240,27 +240,27 @@
       "view/title": [
         {
           "command": "latexReview.startTracking",
-          "when": "view == latexReview.changes && !latexReview.tracking",
+          "when": "view == latexReview.pane && !latexReview.tracking",
           "group": "navigation@1"
         },
         {
           "command": "latexReview.acceptAll",
-          "when": "view == latexReview.changes && latexReview.tracking",
+          "when": "view == latexReview.pane && latexReview.tracking",
           "group": "navigation@1"
         },
         {
           "command": "latexReview.rejectAll",
-          "when": "view == latexReview.changes && latexReview.tracking",
+          "when": "view == latexReview.pane && latexReview.tracking",
           "group": "navigation@2"
         },
         {
           "command": "latexReview.stopTracking",
-          "when": "view == latexReview.changes && latexReview.tracking",
+          "when": "view == latexReview.pane && latexReview.tracking",
           "group": "navigation@3"
         },
         {
           "command": "latexReview.exportMarkedUp",
-          "when": "view == latexReview.changes && latexReview.tracking",
+          "when": "view == latexReview.pane && latexReview.tracking",
           "group": "more@1"
         }
       ],

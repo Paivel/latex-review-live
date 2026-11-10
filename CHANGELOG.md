@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.12
+
+- The Review pane opens from its own icon in the activity bar (it can be dragged to the right side bar).
+
 ## 0.1.11
 
 - Back to ✓ Accept and ✗ Reject above changed lines.
