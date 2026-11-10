@@ -48,13 +48,16 @@ export function revertsWhere(oldText: string, changes: readonly Edit[], bad: (c:
   return out;
 }
 
-/** Sorted, with touching or overlapping ranges joined. */
+/**
+ * Sorted, with overlapping ranges joined. Ranges that only touch stay apart:
+ * the spot between \caption{ and } is where the argument is typed.
+ */
 export function mergeRanges(ranges: [number, number][]): [number, number][] {
   const sorted = ranges.filter(([a, b]) => b > a).sort((x, y) => x[0] - y[0]);
   const out: [number, number][] = [];
   for (const [a, b] of sorted) {
     const last = out[out.length - 1];
-    if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+    if (last && a < last[1]) last[1] = Math.max(last[1], b);
     else out.push([a, b]);
   }
   return out;
@@ -84,4 +87,17 @@ export function cutsHidden(c: Edit, hidden: [number, number][]): boolean {
     if (overlaps && !whole) return true;
   }
   return false;
+}
+
+/**
+ * Where a click should put the cursor: next to a hidden opening "…{" or
+ * closing "}" it goes inside the braces, so the argument is typed at once.
+ */
+export function argumentStop(offset: number, hidden: [number, number][], text: string): number {
+  for (const [a, b] of hidden) {
+    if (b === offset && text[a] === "}") return a;
+    if (a === offset && text[b - 1] === "{") return b;
+    if (a > offset) break;
+  }
+  return offset;
 }

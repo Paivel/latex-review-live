@@ -362,9 +362,13 @@ class Parser {
     }
 
     if (name === "label") {
+      // The key stays in view and editable; only the command and its braces go.
       const g = this.group(after);
       if (!g) return ne;
-      this.hide(i, g.end, [i, g.end]);
+      const owner: [number, number] = [i, g.end];
+      this.replace(i, g.open + 1, "🏷\u2009", owner, "muted");
+      this.hide(g.close, g.end, owner);
+      this.style(g.open + 1, g.close, "muted", owner);
       return g.end;
     }
 

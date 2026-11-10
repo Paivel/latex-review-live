@@ -2,7 +2,7 @@
   "name": "latex-review-live",
   "displayName": "LaTeX Review and Live Preview",
   "description": "Track changes with accept/reject, review comments, and an Obsidian-style live preview that hides LaTeX code while you edit.",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
@@ -403,16 +403,16 @@
         },
         "latexReview.livePreview.reveal": {
           "type": "string",
-          "default": "element",
+          "default": "never",
           "enum": [
             "element",
             "line",
             "never"
           ],
           "enumDescriptions": [
-            "Show the code of the command the cursor is in, as Obsidian does.",
+            "Show the code of the command the cursor is inside, as Obsidian does.",
             "Show the code of the whole line the cursor is on.",
-            "Keep code hidden even under the cursor."
+            "Keep code hidden even under the cursor, as in Word: arguments are typed with the code out of sight."
           ],
           "description": "When live preview shows the LaTeX code under the cursor."
         },

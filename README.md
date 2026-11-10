@@ -37,14 +37,14 @@ Click **Source** in the status bar, the eye button in the editor title, or press
 | `\ce{SO4^2-}`, `\SI{5}{\milli\gram\per\milli\litre}` | SO₄²⁻, 5 mg/mL |
 | `\item`, `` ``q'' ``, `--`, `~`, `\%` | •, “q”, –, non-breaking space, % |
 | `\begin{figure}`, `\end{itemize}` | shown as they are, dimmed |
-| `\footnote{…}`, `\label{…}` | [ … ] dimmed, hidden |
+| `\footnote{…}`, `\label{key}` | [ … ] dimmed, 🏷 key |
 | `\includegraphics{s}`, `\caption{…}` | 🖼 s, Caption: … |
 
 Lines that hold only code (`\label`, `\begin{itemize}`, `\centering`, comments, the preamble) are folded away; the line the cursor is on always stays open. Turn this off with `latexReview.livePreview.foldCode`.
 
 The preamble and anything after `\end{document}` are read-only in live preview (`latexReview.livePreview.protectPreamble`); switch to Source to edit them.
 
-The code of the command the cursor is inside is shown while you edit it, as in Obsidian. Elsewhere the cursor steps over hidden code in one go, and typing or deleting cannot cut into it. `latexReview.livePreview.reveal` switches this to the whole line, or off. The preamble and commands it does not know are left as source. Display math is coloured and its symbols replaced, but it is not typeset.
+Code stays hidden while you type, as in Word: a click next to a command puts the cursor inside its braces, so you type its argument (a caption, a label) at once. The cursor steps over hidden code in one go, and typing or deleting cannot cut into it. Set `latexReview.livePreview.reveal` to `element` to see the code of the command the cursor is in, as in Obsidian, or to `line`. `latexReview.livePreview.reveal` switches this to the whole line, or off. The preamble and commands it does not know are left as source. Display math is coloured and its symbols replaced, but it is not typeset.
 
 ## Settings
 
@@ -54,7 +54,7 @@ The code of the command the cursor is inside is shown while you edit it, as in O
 | `latexReview.lineButtons` | `true` | ✅ / ❌ at the end of changed lines |
 | `latexReview.codeLens` | `false` | Accept / Reject above lines with changes too |
 | `latexReview.livePreview.default` | `false` | Open LaTeX documents in live preview |
-| `latexReview.livePreview.reveal` | `element` | `element`, `line` or `never` |
+| `latexReview.livePreview.reveal` | `never` | `never`, `element` or `line` |
 | `latexReview.livePreview.foldCode` | `true` | Fold lines that hold only code |
 | `latexReview.livePreview.protectPreamble` | `true` | Preamble read-only in live preview |
 

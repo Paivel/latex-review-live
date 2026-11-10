@@ -38,12 +38,24 @@ describe("protected preamble", () => {
   });
 });
 
-import { cutsHidden, mergeRanges, snapOffset } from "../src/preview/protect";
+import { argumentStop, cutsHidden, mergeRanges, snapOffset } from "../src/preview/protect";
 
 describe("hidden code", () => {
-  const hidden = mergeRanges([[10, 18], [18, 19], [30, 31]]);
-  it("joins touching ranges", () => {
+  const hidden = mergeRanges([[10, 15], [12, 19], [30, 31]]);
+  it("joins overlapping ranges, keeps touching ones apart", () => {
     expect(hidden).toEqual([[10, 19], [30, 31]]);
+    expect(mergeRanges([[0, 9], [9, 10]])).toEqual([[0, 9], [9, 10]]);
+  });
+  it("puts a click next to hidden braces inside them", () => {
+    const t = "a \\caption{} b \\label{fig:x}";
+    const cap = t.indexOf("\\caption");
+    const open = t.indexOf("{") + 1;
+    const lab = t.indexOf("\\label");
+    const ranges = mergeRanges([[cap, open], [open, open + 1], [lab, t.indexOf("{", lab) + 1], [t.length - 1, t.length]]);
+    expect(argumentStop(open + 1, ranges, t)).toBe(open); // after the hidden } of an empty caption
+    expect(argumentStop(cap, ranges, t)).toBe(open); // before \caption{
+    expect(argumentStop(t.length, ranges, t)).toBe(t.length - 1); // end of line, after \label{…}
+    expect(argumentStop(1, ranges, t)).toBe(1);
   });
   it("moves a cursor out of hidden code the way it was going", () => {
     expect(snapOffset(12, 10, hidden)).toBe(19);

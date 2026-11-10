@@ -3,7 +3,7 @@ import * as path from "path";
 import { Piece, Refs, Style, noRefs, parseLatex } from "./parse";
 import { readAux } from "./aux";
 import { codeRuns, lineKinds } from "./fold";
-import { cutsHidden, mergeRanges, revertsOutsideBody, revertsWhere, snapOffset } from "./protect";
+import { argumentStop, cutsHidden, mergeRanges, revertsOutsideBody, revertsWhere, snapOffset } from "./protect";
 import { isOwnEdit } from "../own-edits";
 
 const isTex = (doc: vscode.TextDocument) => doc.languageId === "latex" || doc.languageId === "tex";
@@ -104,7 +104,15 @@ export class LivePreview implements vscode.Disposable {
         clearTimeout(this.mouseTimer);
         // Showing the code under a click moves the text; wait until a double or
         // triple click is over, or the second click would land on other text.
-        if (e.kind === vscode.TextEditorSelectionChangeKind.Mouse) this.mouseTimer = setTimeout(() => this.paint(e.textEditor), 450);
+        if (e.kind === vscode.TextEditorSelectionChangeKind.Mouse) {
+          const ed = e.textEditor;
+          const clicked = ed.selections.map((x) => x);
+          this.mouseTimer = setTimeout(() => {
+            // A click by a command's hidden braces goes inside them (once double clicks are over).
+            if (ed.selections.length === clicked.length && ed.selections.every((x, i) => x.isEqual(clicked[i]) && x.isEmpty)) this.toArgument(ed);
+            this.paint(ed);
+          }, 450);
+        }
         else this.paint(e.textEditor);
       }),
       vscode.workspace.onDidChangeTextDocument((e) => {
@@ -229,7 +237,7 @@ export class LivePreview implements vscode.Disposable {
     const pieces = this.pieces(doc);
     if (!this.snapshots.has(doc.uri.toString())) this.snapshots.set(doc.uri.toString(), doc.getText());
     if (!this.cursors.has(doc.uri.toString())) this.rememberCursors(ed);
-    const mode = vscode.workspace.getConfiguration("latexReview").get<string>("livePreview.reveal", "element");
+    const mode = vscode.workspace.getConfiguration("latexReview").get<string>("livePreview.reveal", "never");
     const sel = ed.selections.map((s) => {
       if (mode === "line") return [doc.offsetAt(doc.lineAt(s.start.line).range.start), doc.offsetAt(doc.lineAt(s.end.line).range.end)];
       return [doc.offsetAt(s.start), doc.offsetAt(s.end)];
@@ -320,6 +328,27 @@ export class LivePreview implements vscode.Disposable {
     ed.selections = next;
     setTimeout(() => (this.snapping = false), 0);
     return true;
+  }
+
+  private toArgument(ed: vscode.TextEditor) {
+    const doc = ed.document;
+    const hidden = this.hiddenNow.get(doc.uri.toString());
+    if (!hidden) return;
+    const text = doc.getText();
+    let moved = false;
+    const next = ed.selections.map((x) => {
+      const off = doc.offsetAt(x.active);
+      const to = argumentStop(off, hidden, text);
+      if (to === off) return x;
+      moved = true;
+      const p = doc.positionAt(to);
+      return new vscode.Selection(p, p);
+    });
+    if (!moved) return;
+    this.snapping = true;
+    ed.selections = next;
+    this.rememberCursors(ed);
+    setTimeout(() => (this.snapping = false), 0);
   }
 
   private rememberCursors(ed: vscode.TextEditor) {

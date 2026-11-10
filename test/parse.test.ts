@@ -71,7 +71,7 @@ describe("live preview", () => {
 
   it("keeps \\begin and \\end of figures in view", () => {
     const src = "\\begin{figure}[h]\n\\centering\n\\includegraphics[width=3cm]{figures/scheme}\n\\caption{A scheme}\\label{fig:s}\n\\end{figure}";
-    expect(look(src)).toBe("\\begin{figure}[h]\n\\centering\n🖼 figures/scheme\nCaption: A scheme\n\\end{figure}");
+    expect(look(src)).toBe("\\begin{figure}[h]\n\\centering\n🖼 figures/scheme\nCaption: A scheme🏷\u2009fig:s\n\\end{figure}");
   });
 
   it("does not hang on broken input", () => {

@@ -13,7 +13,7 @@ describe("code-only lines", () => {
     "\\usepackage{x}", //          1 code
     "\\begin{document}", //        2 text (shown)
     "\\section{Intro}", //         3 text
-    "\\label{sec:intro}", //       4 code
+    "\\label{sec:intro}", //       4 text (its key shows)
     "% a note", //                 5 code
     "", //                         6 blank
     "Some \\textbf{text}.", //     7 text
@@ -27,21 +27,20 @@ describe("code-only lines", () => {
   ].join("\n");
 
   it("tells text, code and blank lines apart", () => {
-    expect(kinds(src)).toEqual(["code", "code", "text", "text", "code", "code", "blank", "text", "text", "text", "text", "code", "blank", "text", "text"]);
+    expect(kinds(src)).toEqual(["code", "code", "text", "text", "text", "code", "blank", "text", "text", "text", "text", "code", "blank", "text", "text"]);
   });
 
   it("folds each run from the line above it, blank lines inside a run included", () => {
     expect(codeRuns(kinds(src), new Set())).toEqual([
       [0, 1],
-      [3, 5],
+      [4, 5],
       [10, 11],
     ]);
   });
 
   it("keeps the cursor's line open and folds the rest of its run", () => {
-    expect(codeRuns(kinds(src), new Set([4]))).toEqual([
+    expect(codeRuns(kinds(src), new Set([5]))).toEqual([
       [0, 1],
-      [4, 5],
       [10, 11],
     ]);
     // Cursor in the middle of the preamble: above it and below it fold.

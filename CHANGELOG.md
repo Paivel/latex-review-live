@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.7
+
+- Live preview: a click by a command puts the cursor inside its braces, so its argument is typed at once.
+- Live preview: \\label keys stay in view (🏷 key) and can be edited; only the command and braces are hidden.
+- Live preview keeps code hidden under the cursor by default, as in Word (`latexReview.livePreview.reveal`: `never`; `element` is the Obsidian way).
+
 ## 0.1.6
 
 - ✅ Accept and ❌ Reject at the end of each changed line, clickable (`latexReview.lineButtons`).
