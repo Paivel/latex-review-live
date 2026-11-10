@@ -13,9 +13,9 @@ Click **Track changes** in the status bar (or run *LaTeX Review: Start Tracking 
 
 - inserted text is blue and underlined, deleted text is shown in red, struck through, where it was;
 - a mark in the left margin shows each changed line (green: added, red: deleted, orange: rewritten);
-- **✅ / ❌ at the end of each changed line**: click to accept or reject that change;
+- **Accept / Reject** above each changed line;
 - the **Review** pane on the right (the secondary side bar) shows every change as a card with a green **Accept** and a red **Reject**, plus Accept All and Reject All; the change at the cursor is outlined, and clicking a card jumps to it;
-- each change also has Accept / Reject in its hover and in the lightbulb (`Ctrl+.` / `Cmd+.`); select a passage to accept or reject all changes in it. `latexReview.codeLens` adds them above the line as well;
+- each change also has Accept / Reject in its hover and in the lightbulb (`Ctrl+.` / `Cmd+.`); select a passage to accept or reject all changes in it.
 - `Ctrl+Alt+]` / `Ctrl+Alt+[` (`Cmd+Alt+]` / `Cmd+Alt+[` on Mac) go to the next or previous change.
 
 **Comments**: select text, write in the Comments box of the Review pane and click Add comment; reply, resolve and delete there too. Or press `Ctrl+Alt+M` (`Cmd+Alt+M`), or click `+` in the gutter. Threads take replies, can be resolved, edited and deleted. Commented text is highlighted.
@@ -51,8 +51,7 @@ Code stays hidden while you type, as in Word: a click next to a command puts the
 | Setting | Default | |
 |---|---|---|
 | `latexReview.author` | git `user.name` | Your name on comments |
-| `latexReview.lineButtons` | `true` | ✅ / ❌ at the end of changed lines |
-| `latexReview.codeLens` | `false` | Accept / Reject above lines with changes too |
+| `latexReview.codeLens` | `true` | Accept / Reject above lines with changes |
 | `latexReview.livePreview.default` | `false` | Open LaTeX documents in live preview |
 | `latexReview.livePreview.reveal` | `never` | `never`, `element` or `line` |
 | `latexReview.livePreview.foldCode` | `true` | Fold lines that hold only code |

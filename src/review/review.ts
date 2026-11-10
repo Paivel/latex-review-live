@@ -244,10 +244,6 @@ export class TrackChanges implements vscode.Disposable {
         onDidChangeCodeLenses: this.codeLensChanged.event,
         provideCodeLenses: (doc) => this.lenses(doc),
       }),
-      vscode.languages.registerInlayHintsProvider(sel, {
-        onDidChangeInlayHints: this.codeLensChanged.event,
-        provideInlayHints: (doc, range) => this.sideButtons(doc, range),
-      }),
       vscode.languages.registerHoverProvider(sel, { provideHover: (doc, pos) => this.hover(doc, pos) }),
       vscode.languages.registerCodeActionsProvider(sel, { provideCodeActions: (doc, range) => this.actions(doc, range) }),
       vscode.window.registerWebviewViewProvider("latexReview.changes", this.pane, { webviewOptions: { retainContextWhenHidden: true } }),
@@ -493,7 +489,7 @@ export class TrackChanges implements vscode.Disposable {
   }
 
   private lenses(doc: vscode.TextDocument): vscode.CodeLens[] {
-    if (!vscode.workspace.getConfiguration("latexReview").get<boolean>("codeLens", false)) return [];
+    if (!vscode.workspace.getConfiguration("latexReview").get<boolean>("codeLens", true)) return [];
     const r = this.store.peek(doc);
     if (!r?.tracking) return [];
     const byLine = new Map<number, Change[]>();
@@ -507,59 +503,19 @@ export class TrackChanges implements vscode.Disposable {
       if (cs.length === 1) {
         const ref = this.ref(doc, cs[0]);
         out.push(
-          new vscode.CodeLens(range, { title: "✅ Accept", command: "latexReview.acceptChange", arguments: [ref] }),
-          new vscode.CodeLens(range, { title: "❌ Reject", command: "latexReview.rejectChange", arguments: [ref] }),
+          new vscode.CodeLens(range, { title: "✓ Accept", command: "latexReview.acceptChange", arguments: [ref] }),
+          new vscode.CodeLens(range, { title: "✗ Reject", command: "latexReview.rejectChange", arguments: [ref] }),
         );
       } else {
         for (const c of cs.slice(0, 4)) {
           const ref = this.ref(doc, c);
           out.push(
-            new vscode.CodeLens(range, { title: `✅ ${describe(c)}`, tooltip: "Accept this change", command: "latexReview.acceptChange", arguments: [ref] }),
-            new vscode.CodeLens(range, { title: "❌", tooltip: "Reject this change", command: "latexReview.rejectChange", arguments: [ref] }),
+            new vscode.CodeLens(range, { title: `✓ ${describe(c)}`, tooltip: "Accept this change", command: "latexReview.acceptChange", arguments: [ref] }),
+            new vscode.CodeLens(range, { title: "✗", tooltip: "Reject this change", command: "latexReview.rejectChange", arguments: [ref] }),
           );
         }
         if (cs.length > 4) out.push(new vscode.CodeLens(range, { title: `+${cs.length - 4} more`, command: "latexReview.nextChange" }));
       }
-    }
-    return out;
-  }
-
-  /** ✅ ❌ at the end of each line with a change: click to accept or reject it. */
-  private sideButtons(doc: vscode.TextDocument, range: vscode.Range): vscode.InlayHint[] {
-    if (!vscode.workspace.getConfiguration("latexReview").get<boolean>("lineButtons", true)) return [];
-    const r = this.store.peek(doc);
-    if (!r?.tracking) return [];
-    const byLine = new Map<number, Change[]>();
-    for (const c of r.changes) {
-      const line = doc.positionAt(c.inserted ? c.curEnd : c.curStart).line;
-      if (line < range.start.line || line > range.end.line) continue;
-      byLine.set(line, [...(byLine.get(line) ?? []), c]);
-    }
-    const out: vscode.InlayHint[] = [];
-    for (const [line, cs] of byLine) {
-      const parts: vscode.InlayHintLabelPart[] = [];
-      cs.forEach((c, i) => {
-        const ref = this.ref(doc, c);
-        const what = cs.length > 1 ? ` ${describe(c)}` : "";
-        if (i > 0) parts.push(new vscode.InlayHintLabelPart("   "));
-        // VS Code runs a hint's command on Cmd/Ctrl+click only; the hover offers a plain-click link too.
-        const arg = encodeURIComponent(JSON.stringify([ref]));
-        const tip = (cmd: string, label: string) => {
-          const md = new vscode.MarkdownString(`[${label}](command:${cmd}?${arg}) · Cmd/Ctrl+click the mark`);
-          md.isTrusted = { enabledCommands: [cmd] };
-          return md;
-        };
-        const ok = new vscode.InlayHintLabelPart(`✅${what}`);
-        ok.command = { title: "Accept", command: "latexReview.acceptChange", arguments: [ref] };
-        ok.tooltip = tip("latexReview.acceptChange", "✅ Accept");
-        const no = new vscode.InlayHintLabelPart(" ❌");
-        no.command = { title: "Reject", command: "latexReview.rejectChange", arguments: [ref] };
-        no.tooltip = tip("latexReview.rejectChange", "❌ Reject");
-        parts.push(ok, no);
-      });
-      const hint = new vscode.InlayHint(doc.lineAt(line).range.end, parts);
-      hint.paddingLeft = true;
-      out.push(hint);
     }
     return out;
   }
