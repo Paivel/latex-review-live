@@ -2,10 +2,11 @@ import * as vscode from "vscode";
 import { ReviewStore, TrackChanges } from "./review/review";
 import { Comments } from "./review/comments";
 import { LivePreview } from "./preview/livePreview";
+import { AutoBib } from "./bib/autoBib";
 
 export function activate(context: vscode.ExtensionContext) {
   const store = new ReviewStore();
-  context.subscriptions.push(store, new TrackChanges(store, context.extensionUri), new Comments(store), new LivePreview(context.workspaceState));
+  context.subscriptions.push(store, new TrackChanges(store, context.extensionUri), new Comments(store), new LivePreview(context.workspaceState), new AutoBib());
 }
 
 export function deactivate() {}

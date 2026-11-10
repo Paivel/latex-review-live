@@ -45,6 +45,10 @@ The preamble and anything after `\end{document}` are read-only in live preview (
 
 Code stays hidden while you type, as in Word: a click next to a command puts the cursor inside its braces, so you type its argument (a caption, a label) at once. The cursor steps over hidden code in one go, and typing or deleting cannot cut into it. Set `latexReview.livePreview.reveal` to `element` to see the code of the command the cursor is in, as in Obsidian, or to `line`. `latexReview.livePreview.reveal` switches this to the whole line, or off. The preamble and commands it does not know are left as source. Display math is coloured and its symbols replaced, but it is not typeset.
 
+## Bibliography from Zotero
+
+Insert citations with any picker (for example Citation Picker for Zotero, set to `format=latex`). When a `\cite{key}` is not in the `.bib` file named by `\bibliography{refs}` or `\addbibresource{refs.bib}`, the extension asks Zotero for it through Better BibTeX and appends the entry (the file is created if needed). It runs on save and about a second after the set of cited keys changes. Zotero with Better BibTeX must be running. Run **LaTeX Review: Update Bibliography from Zotero** to do it by hand.
+
 ## Settings
 
 | Setting | Default | |

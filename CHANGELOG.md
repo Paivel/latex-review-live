@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.15
+
+- Bibliography from Zotero: a \cite key that is missing from the .bib named by \bibliography or \addbibresource is fetched from Zotero (Better BibTeX) and appended. Runs on save and shortly after you add a citation; also "LaTeX Review: Update Bibliography from Zotero".
+
 ## 0.1.14
 
 - No more Accept / Reject above lines (and no setting for it): the Review pane, the hover and Cmd+. have them.

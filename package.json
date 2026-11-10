@@ -2,7 +2,7 @@
   "name": "latex-review-live",
   "displayName": "LaTeX Review and Live Preview",
   "description": "Track changes with accept/reject, review comments, and an Obsidian-style live preview that hides LaTeX code while you edit.",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
@@ -35,6 +35,11 @@
   },
   "contributes": {
     "commands": [
+      {
+        "command": "latexReview.updateBibliography",
+        "title": "Update Bibliography from Zotero",
+        "category": "LaTeX Review"
+      },
       {
         "command": "latexReview.toggleLivePreview",
         "title": "Toggle Live Preview",
@@ -420,6 +425,16 @@
           "type": "boolean",
           "default": true,
           "description": "In live preview, keep the preamble and anything after \\end{document} read-only (edits there are undone at once). Switch to Source to edit them."
+        },
+        "latexReview.zotero.autoBibliography": {
+          "type": "boolean",
+          "default": true,
+          "description": "When a \\cite key is missing from the document's .bib file (\\bibliography or \\addbibresource), fetch the entry from Zotero (Better BibTeX) and append it. Zotero must be running."
+        },
+        "latexReview.zotero.server": {
+          "type": "string",
+          "default": "http://127.0.0.1:23119",
+          "description": "Address of Zotero's local server."
         }
       }
     },
