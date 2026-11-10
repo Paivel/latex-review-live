@@ -503,15 +503,15 @@ export class TrackChanges implements vscode.Disposable {
       if (cs.length === 1) {
         const ref = this.ref(doc, cs[0]);
         out.push(
-          new vscode.CodeLens(range, { title: "✓ Accept", command: "latexReview.acceptChange", arguments: [ref] }),
-          new vscode.CodeLens(range, { title: "✗ Reject", command: "latexReview.rejectChange", arguments: [ref] }),
+          new vscode.CodeLens(range, { title: "🟢 Accept", command: "latexReview.acceptChange", arguments: [ref] }),
+          new vscode.CodeLens(range, { title: "🔴 Reject", command: "latexReview.rejectChange", arguments: [ref] }),
         );
       } else {
         for (const c of cs.slice(0, 4)) {
           const ref = this.ref(doc, c);
           out.push(
-            new vscode.CodeLens(range, { title: `✓ ${describe(c)}`, tooltip: "Accept this change", command: "latexReview.acceptChange", arguments: [ref] }),
-            new vscode.CodeLens(range, { title: "✗", tooltip: "Reject this change", command: "latexReview.rejectChange", arguments: [ref] }),
+            new vscode.CodeLens(range, { title: `🟢 ${describe(c)}`, tooltip: "Accept this change", command: "latexReview.acceptChange", arguments: [ref] }),
+            new vscode.CodeLens(range, { title: "🔴", tooltip: "Reject this change", command: "latexReview.rejectChange", arguments: [ref] }),
           );
         }
         if (cs.length > 4) out.push(new vscode.CodeLens(range, { title: `+${cs.length - 4} more`, command: "latexReview.nextChange" }));
