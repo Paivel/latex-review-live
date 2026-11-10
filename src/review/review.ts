@@ -489,7 +489,7 @@ export class TrackChanges implements vscode.Disposable {
   }
 
   private lenses(doc: vscode.TextDocument): vscode.CodeLens[] {
-    if (!vscode.workspace.getConfiguration("latexReview").get<boolean>("codeLens", true)) return [];
+    if (!vscode.workspace.getConfiguration("latexReview").get<boolean>("codeLens", false)) return [];
     const r = this.store.peek(doc);
     if (!r?.tracking) return [];
     const byLine = new Map<number, Change[]>();

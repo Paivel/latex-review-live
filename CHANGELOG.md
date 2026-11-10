@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.13
+
+- Accept / Reject above lines is off by default: the Review pane has them.
+
 ## 0.1.12
 
 - The Review pane opens from its own icon in the activity bar (it can be dragged to the right side bar).
