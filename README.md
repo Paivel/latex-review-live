@@ -50,7 +50,6 @@ Code stays hidden while you type, as in Word: a click next to a command puts the
 | Setting | Default | |
 |---|---|---|
 | `latexReview.author` | git `user.name` | Your name on comments |
-| `latexReview.codeLens` | `false` | Accept / Reject above lines with changes too |
 | `latexReview.livePreview.default` | `false` | Open LaTeX documents in live preview |
 | `latexReview.livePreview.reveal` | `never` | `never`, `element` or `line` |
 | `latexReview.livePreview.foldCode` | `true` | Fold lines that hold only code |

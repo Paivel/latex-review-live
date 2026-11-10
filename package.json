@@ -2,7 +2,7 @@
   "name": "latex-review-live",
   "displayName": "LaTeX Review and Live Preview",
   "description": "Track changes with accept/reject, review comments, and an Obsidian-style live preview that hides LaTeX code while you edit.",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
@@ -390,11 +390,6 @@
           "type": "string",
           "default": "",
           "description": "Your name on comments. Empty: git user.name, else your account name."
-        },
-        "latexReview.codeLens": {
-          "type": "boolean",
-          "default": false,
-          "description": "Also show Accept / Reject above lines with tracked changes (they are always in the Review pane)."
         },
         "latexReview.livePreview.default": {
           "type": "boolean",

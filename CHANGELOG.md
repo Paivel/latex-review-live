@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.14
+
+- No more Accept / Reject above lines (and no setting for it): the Review pane, the hover and Cmd+. have them.
+
 ## 0.1.13
 
 - Accept / Reject above lines is off by default: the Review pane has them.

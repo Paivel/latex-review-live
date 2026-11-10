@@ -240,16 +240,11 @@ export class TrackChanges implements vscode.Disposable {
         this.updateContext();
         this.treeChanged.fire();
       }),
-      vscode.languages.registerCodeLensProvider(sel, {
-        onDidChangeCodeLenses: this.codeLensChanged.event,
-        provideCodeLenses: (doc) => this.lenses(doc),
-      }),
       vscode.languages.registerHoverProvider(sel, { provideHover: (doc, pos) => this.hover(doc, pos) }),
       vscode.languages.registerCodeActionsProvider(sel, { provideCodeActions: (doc, range) => this.actions(doc, range) }),
       vscode.window.registerWebviewViewProvider("latexReview.pane", this.pane, { webviewOptions: { retainContextWhenHidden: true } }),
       this.treeChanged.event(() => this.updatePane()),
       vscode.window.onDidChangeTextEditorSelection((e) => e.textEditor === vscode.window.activeTextEditor && this.updatePane()),
-      vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration("latexReview.codeLens") && this.codeLensChanged.fire()),
       vscode.commands.registerCommand("latexReview.startTracking", () => this.start()),
       vscode.commands.registerCommand("latexReview.stopTracking", () => this.stop()),
       vscode.commands.registerCommand("latexReview.acceptChange", (ref?: ChangeRef | { change: ChangeRef }) => this.decide(true, ref)),
@@ -486,38 +481,6 @@ export class TrackChanges implements vscode.Disposable {
 
   private ref(doc: vscode.TextDocument, c: Change): ChangeRef {
     return { uri: doc.uri.toString(), curStart: c.curStart, curEnd: c.curEnd };
-  }
-
-  private lenses(doc: vscode.TextDocument): vscode.CodeLens[] {
-    if (!vscode.workspace.getConfiguration("latexReview").get<boolean>("codeLens", false)) return [];
-    const r = this.store.peek(doc);
-    if (!r?.tracking) return [];
-    const byLine = new Map<number, Change[]>();
-    for (const c of r.changes) {
-      const line = doc.positionAt(c.curStart).line;
-      byLine.set(line, [...(byLine.get(line) ?? []), c]);
-    }
-    const out: vscode.CodeLens[] = [];
-    for (const [line, cs] of byLine) {
-      const range = new vscode.Range(line, 0, line, 0);
-      if (cs.length === 1) {
-        const ref = this.ref(doc, cs[0]);
-        out.push(
-          new vscode.CodeLens(range, { title: "✓ Accept", command: "latexReview.acceptChange", arguments: [ref] }),
-          new vscode.CodeLens(range, { title: "✗ Reject", command: "latexReview.rejectChange", arguments: [ref] }),
-        );
-      } else {
-        for (const c of cs.slice(0, 4)) {
-          const ref = this.ref(doc, c);
-          out.push(
-            new vscode.CodeLens(range, { title: `✓ ${describe(c)}`, tooltip: "Accept this change", command: "latexReview.acceptChange", arguments: [ref] }),
-            new vscode.CodeLens(range, { title: "✗", tooltip: "Reject this change", command: "latexReview.rejectChange", arguments: [ref] }),
-          );
-        }
-        if (cs.length > 4) out.push(new vscode.CodeLens(range, { title: `+${cs.length - 4} more`, command: "latexReview.nextChange" }));
-      }
-    }
-    return out;
   }
 
   private hover(doc: vscode.TextDocument, pos: vscode.Position): vscode.Hover | undefined {
