@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.11
+
+- Back to ✓ Accept and ✗ Reject above changed lines.
+
 ## 0.1.9
 
 - Back to plain Accept / Reject above changed lines (on by default); the marks at the end of lines are gone.
