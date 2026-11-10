@@ -29,6 +29,10 @@ describe("protected preamble", () => {
     expect(apply(now, revertsOutsideBody(doc, changes))).toBe(doc.replace("Hello", "Hi"));
   });
 
+  it("leaves edits that are not the user's alone", () => {
+    expect(revertsOutsideBody(doc, [{ rangeOffset: 1, rangeLength: 0, text: "\\usepackage{x}\n" }], () => false)).toEqual([]);
+  });
+
   it("leaves a file with no \\begin{document} alone", () => {
     expect(revertsOutsideBody("just text", [{ rangeOffset: 0, rangeLength: 0, text: "a" }])).toEqual([]);
   });

@@ -16,8 +16,10 @@ export interface Edit {
 /**
  * The edits that undo those touching the preamble or what follows
  * \end{document}, as ranges of the new text with the old text to put back.
+ * byUser tells typing from edits made by other extensions (such as a figure
+ * paste adding its \usepackage lines), which are left alone.
  */
-export function revertsOutsideBody(oldText: string, changes: readonly Edit[]): { start: number; end: number; text: string }[] {
+export function revertsOutsideBody(oldText: string, changes: readonly Edit[], byUser: (c: Edit) => boolean = () => true): { start: number; end: number; text: string }[] {
   const bounds = bodyBounds(oldText);
   if (!bounds) return [];
   const [from, to] = bounds;
@@ -25,7 +27,7 @@ export function revertsOutsideBody(oldText: string, changes: readonly Edit[]): {
   const out: { start: number; end: number; text: string }[] = [];
   let shift = 0;
   for (const c of sorted) {
-    const outside = c.rangeOffset < from || c.rangeOffset + c.rangeLength > to;
+    const outside = (c.rangeOffset < from || c.rangeOffset + c.rangeLength > to) && byUser(c);
     const start = c.rangeOffset + shift;
     if (outside) out.push({ start, end: start + c.text.length, text: oldText.slice(c.rangeOffset, c.rangeOffset + c.rangeLength) });
     shift += c.text.length - c.rangeLength;
