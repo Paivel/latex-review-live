@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8
+
+- ✅ / ❌ at the end of a line: Cmd/Ctrl+click, or hover and click the link.
+
 ## 0.1.7
 
 - Live preview: a click by a command puts the cursor inside its braces, so its argument is typed at once.

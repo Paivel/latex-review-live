@@ -542,12 +542,19 @@ export class TrackChanges implements vscode.Disposable {
         const ref = this.ref(doc, c);
         const what = cs.length > 1 ? ` ${describe(c)}` : "";
         if (i > 0) parts.push(new vscode.InlayHintLabelPart("   "));
+        // VS Code runs a hint's command on Cmd/Ctrl+click only; the hover offers a plain-click link too.
+        const arg = encodeURIComponent(JSON.stringify([ref]));
+        const tip = (cmd: string, label: string) => {
+          const md = new vscode.MarkdownString(`[${label}](command:${cmd}?${arg}) · Cmd/Ctrl+click the mark`);
+          md.isTrusted = { enabledCommands: [cmd] };
+          return md;
+        };
         const ok = new vscode.InlayHintLabelPart(`✅${what}`);
         ok.command = { title: "Accept", command: "latexReview.acceptChange", arguments: [ref] };
-        ok.tooltip = "Accept this change";
+        ok.tooltip = tip("latexReview.acceptChange", "✅ Accept");
         const no = new vscode.InlayHintLabelPart(" ❌");
         no.command = { title: "Reject", command: "latexReview.rejectChange", arguments: [ref] };
-        no.tooltip = "Reject this change";
+        no.tooltip = tip("latexReview.rejectChange", "❌ Reject");
         parts.push(ok, no);
       });
       const hint = new vscode.InlayHint(doc.lineAt(line).range.end, parts);
