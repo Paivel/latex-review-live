@@ -2,7 +2,7 @@
   "name": "latex-review-live",
   "displayName": "LaTeX Review and Live Preview",
   "description": "Track changes with accept/reject, review comments, and an Obsidian-style live preview that hides LaTeX code while you edit.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
@@ -438,6 +438,11 @@
             "Keep code hidden even under the cursor."
           ],
           "description": "When live preview shows the LaTeX code under the cursor."
+        },
+        "latexReview.livePreview.foldCode": {
+          "type": "boolean",
+          "default": true,
+          "description": "In live preview, fold away lines that hold only LaTeX code (labels, \\begin{itemize}, comments, the preamble). The line under the cursor is always shown."
         }
       }
     },

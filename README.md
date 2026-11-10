@@ -12,7 +12,8 @@ Your `.tex` file always stays plain LaTeX. It builds with LaTeX Workshop as befo
 Click **Track changes** in the status bar (or run *LaTeX Review: Start Tracking Changes*). From then on:
 
 - inserted text is blue and underlined, deleted text is shown in red, struck through, where it was;
-- every change has **✓ Accept / ✗ Reject** above its line, in its hover and in the lightbulb (`Ctrl+.` / `Cmd+.`); select a passage to accept or reject all changes in it;
+- a mark in the left margin shows each changed line (green: added, red: deleted, orange: rewritten);
+- every change has **✅ Accept / ❌ Reject** above its line, in its hover and in the lightbulb (`Ctrl+.` / `Cmd+.`); select a passage to accept or reject all changes in it;
 - the **LaTeX Review** view in the activity bar lists all changes, with Accept All and Reject All;
 - `Ctrl+Alt+]` / `Ctrl+Alt+[` (`Cmd+Alt+]` / `Cmd+Alt+[` on Mac) go to the next or previous change.
 
@@ -37,6 +38,8 @@ Click **Source** in the status bar, the eye button in the editor title, or press
 | `\footnote{…}`, `\label{…}` | [ … ] dimmed, hidden |
 | `\begin{figure}…\includegraphics{s}…\caption{…}` | ▣ Figure, 🖼 s, Caption: … |
 
+Lines that hold only code (`\label`, `\begin{itemize}`, `\centering`, comments, the preamble) are folded away; the line the cursor is on always stays open. Turn this off with `latexReview.livePreview.foldCode`.
+
 The code of the command under the cursor is shown while you edit it, as in Obsidian. `latexReview.livePreview.reveal` switches this to the whole line, or off. The preamble and commands it does not know are left as source. Display math is coloured and its symbols replaced, but it is not typeset.
 
 ## Settings
@@ -47,6 +50,7 @@ The code of the command under the cursor is shown while you edit it, as in Obsid
 | `latexReview.codeLens` | `true` | Accept / Reject above lines with changes |
 | `latexReview.livePreview.default` | `false` | Open LaTeX documents in live preview |
 | `latexReview.livePreview.reveal` | `element` | `element`, `line` or `never` |
+| `latexReview.livePreview.foldCode` | `true` | Fold lines that hold only code |
 
 Colours (inserted, deleted, comment, heading, math, references) can be changed under `workbench.colorCustomizations`, e.g. `"latexReview.insertedForeground": "#1a56c9"`.
 

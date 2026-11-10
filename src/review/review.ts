@@ -214,12 +214,17 @@ export class TrackChanges implements vscode.Disposable {
   private codeLensChanged = new vscode.EventEmitter<void>();
   private treeChanged = new vscode.EventEmitter<void>();
   private status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
+  private gutter: Record<"insert" | "delete" | "replace", vscode.TextEditorDecorationType>;
 
-  constructor(private store: ReviewStore) {
+  constructor(private store: ReviewStore, extensionUri: vscode.Uri) {
+    const icon = (name: string) =>
+      vscode.window.createTextEditorDecorationType({ gutterIconPath: vscode.Uri.joinPath(extensionUri, "images", `gutter-${name}.svg`), gutterIconSize: "contain" });
+    this.gutter = { insert: icon("insert"), delete: icon("delete"), replace: icon("replace") };
     const sel: vscode.DocumentSelector = [{ language: "latex" }, { language: "tex" }];
     this.subs.push(
       this.inserted,
       this.deleted,
+      ...Object.values(this.gutter),
       this.status,
       store.onDidChange((r) => {
         for (const ed of vscode.window.visibleTextEditors) if (ed.document.uri.toString() === r.uri.toString()) this.paint(ed, r);
@@ -285,6 +290,20 @@ export class TrackChanges implements vscode.Disposable {
     }
     ed.setDecorations(this.inserted, ins);
     ed.setDecorations(this.deleted, del);
+    // One mark per line on the left, by the strongest kind of change on it.
+    const lines = new Map<number, "insert" | "delete" | "replace">();
+    for (const c of r.changes) {
+      const k = kindOf(c);
+      const from = doc.positionAt(c.curStart).line;
+      const to = c.inserted ? doc.positionAt(c.curEnd).line : from;
+      for (let l = from; l <= to; l++) {
+        const was = lines.get(l);
+        lines.set(l, !was || was === k ? k : "replace");
+      }
+    }
+    for (const k of ["insert", "delete", "replace"] as const) {
+      ed.setDecorations(this.gutter[k], [...lines].filter(([, v]) => v === k).map(([l]) => new vscode.Range(l, 0, l, 0)));
+    }
   }
 
   private activeTex(): vscode.TextEditor | undefined {
@@ -473,15 +492,15 @@ export class TrackChanges implements vscode.Disposable {
       if (cs.length === 1) {
         const ref = this.ref(doc, cs[0]);
         out.push(
-          new vscode.CodeLens(range, { title: "✓ Accept", command: "latexReview.acceptChange", arguments: [ref] }),
-          new vscode.CodeLens(range, { title: "✗ Reject", command: "latexReview.rejectChange", arguments: [ref] }),
+          new vscode.CodeLens(range, { title: "✅ Accept", command: "latexReview.acceptChange", arguments: [ref] }),
+          new vscode.CodeLens(range, { title: "❌ Reject", command: "latexReview.rejectChange", arguments: [ref] }),
         );
       } else {
         for (const c of cs.slice(0, 4)) {
           const ref = this.ref(doc, c);
           out.push(
-            new vscode.CodeLens(range, { title: `✓ ${describe(c)}`, tooltip: "Accept this change", command: "latexReview.acceptChange", arguments: [ref] }),
-            new vscode.CodeLens(range, { title: "✗", tooltip: "Reject this change", command: "latexReview.rejectChange", arguments: [ref] }),
+            new vscode.CodeLens(range, { title: `✅ ${describe(c)}`, tooltip: "Accept this change", command: "latexReview.acceptChange", arguments: [ref] }),
+            new vscode.CodeLens(range, { title: "❌", tooltip: "Reject this change", command: "latexReview.rejectChange", arguments: [ref] }),
           );
         }
         if (cs.length > 4) out.push(new vscode.CodeLens(range, { title: `+${cs.length - 4} more`, command: "latexReview.nextChange" }));

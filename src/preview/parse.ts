@@ -28,6 +28,8 @@ export interface Piece {
   text?: string;
   textStyle?: Style;
   style?: Style;
+  /** Styled text that is LaTeX code all the same (comments, layout commands): lines of only this fold away. */
+  code?: boolean;
   owner: [number, number];
 }
 
@@ -115,8 +117,8 @@ class Parser {
   private replace(start: number, end: number, text: string, owner: [number, number], textStyle?: Style) {
     this.out.push({ start, end, hide: true, text, owner, ...(textStyle ? { textStyle } : {}) });
   }
-  private style(start: number, end: number, style: Style, owner: [number, number]) {
-    if (end > start) this.out.push({ start, end, style, owner });
+  private style(start: number, end: number, style: Style, owner: [number, number], code = false) {
+    if (end > start) this.out.push({ start, end, style, owner, ...(code ? { code } : {}) });
   }
 
   /** After a command name: its end. */
@@ -199,7 +201,7 @@ class Parser {
       if (ch === "%") {
         let e = i;
         while (e < to && t[e] !== "\n") e++;
-        this.style(i, e, "muted", [i, e]);
+        this.style(i, e, "muted", [i, e], true);
         i = e;
       } else if (ch === "\\") {
         i = this.command(i, to);
@@ -523,7 +525,7 @@ class Parser {
         const g = this.group(e);
         if (g) e = g.end;
       }
-      this.style(i, e, "muted", [i, e]);
+      this.style(i, e, "muted", [i, e], true);
       return e;
     }
 
@@ -542,8 +544,8 @@ class Parser {
       const endG = this.group(k + 4);
       const stop = endG ? endG.end : k;
       const all: [number, number] = [i, stop];
-      this.style(i, g.end, "muted", all);
-      this.style(k, stop, "muted", all);
+      this.style(i, g.end, "muted", all, true);
+      this.style(k, stop, "muted", all, true);
       this.style(g.end, k, "math", all);
       this.math(g.end, k, all);
       return stop;
@@ -590,11 +592,11 @@ class Parser {
       if (k < 0) return g.end;
       const endG = this.group(k + 4);
       const stop = endG ? endG.end : k;
-      this.style(g.end, k, env === "comment" ? "muted" : "code", [i, stop]);
+      this.style(g.end, k, env === "comment" ? "muted" : "code", [i, stop], env === "comment");
       return stop;
     }
 
-    this.style(i, g.end, "muted", owner);
+    this.style(i, g.end, "muted", owner, true);
     return g.end;
   }
 

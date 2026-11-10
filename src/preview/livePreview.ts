@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { Piece, Refs, Style, noRefs, parseLatex } from "./parse";
 import { readAux } from "./aux";
+import { codeRuns, lineKinds } from "./fold";
 
 const isTex = (doc: vscode.TextDocument) => doc.languageId === "latex" || doc.languageId === "tex";
 
@@ -53,6 +54,10 @@ export class LivePreview implements vscode.Disposable {
   private status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   private timers = new Map<string, NodeJS.Timeout>();
   private subs: vscode.Disposable[] = [];
+  /** Per document: the code runs we have folded, by their text, so each is folded once. */
+  private folded = new Map<string, Set<string>>();
+  private foldTimer: NodeJS.Timeout | undefined;
+  private folding = false;
 
   constructor(private state: vscode.Memento) {
     for (const [k, look] of Object.entries(LOOKS) as [Style, Look][]) {
@@ -79,7 +84,7 @@ export class LivePreview implements vscode.Disposable {
       vscode.commands.registerCommand("latexReview.showSource", () => this.set(false)),
       vscode.window.onDidChangeVisibleTextEditors(() => this.repaintAll()),
       vscode.window.onDidChangeActiveTextEditor(() => this.updateStatus()),
-      vscode.window.onDidChangeTextEditorSelection((e) => this.isOn(e.textEditor.document) && this.paint(e.textEditor)),
+      vscode.window.onDidChangeTextEditorSelection((e) => !this.folding && this.isOn(e.textEditor.document) && this.paint(e.textEditor)),
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (!this.isOn(e.document) || e.contentChanges.length === 0) return;
         const key = e.document.uri.toString();
@@ -93,6 +98,10 @@ export class LivePreview implements vscode.Disposable {
         );
       }),
       vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration("latexReview.livePreview.foldCode")) {
+          const ed = vscode.window.activeTextEditor;
+          if (ed && this.isOn(ed.document) && !this.foldOn(ed.document)) void this.unfoldAll(ed);
+        }
         if (e.affectsConfiguration("latexReview.livePreview")) this.repaintAll();
       }),
       vscode.workspace.onDidCloseTextDocument((d) => this.cache.delete(d.uri.toString())),
@@ -125,6 +134,8 @@ export class LivePreview implements vscode.Disposable {
       this.off.add(k);
       this.on.delete(k);
     }
+    if (!live) await this.unfoldAll(ed);
+    else this.folded.delete(k);
     await this.state.update("latexReview.liveDocs", [...this.on].slice(-200));
     await this.state.update("latexReview.sourceDocs", [...this.off].slice(-200));
     this.repaintAll();
@@ -208,6 +219,81 @@ export class LivePreview implements vscode.Disposable {
     }
     ed.setDecorations(this.hideType, hidden);
     for (const [s, t] of this.styleTypes) ed.setDecorations(t, styled.get(s) ?? []);
+    if (ed === vscode.window.activeTextEditor) this.scheduleFold(ed);
+  }
+
+  private foldOn(doc: vscode.TextDocument): boolean {
+    return this.isOn(doc) && vscode.workspace.getConfiguration("latexReview").get<boolean>("livePreview.foldCode", true);
+  }
+
+  /** Lines that hold only code, as folding ranges; none in source view or around the cursor. */
+  private runs(doc: vscode.TextDocument): [number, number][] {
+    if (!this.foldOn(doc)) return [];
+    const text = doc.getText();
+    const begin = /\\begin\s*\{document\}/.exec(text);
+    const kinds = lineKinds(text, this.pieces(doc), begin ? begin.index : 0);
+    const open = new Set<number>();
+    for (const ed of vscode.window.visibleTextEditors) {
+      if (ed.document !== doc) continue;
+      for (const s of ed.selections) for (let l = s.start.line; l <= s.end.line; l++) open.add(l);
+    }
+    return codeRuns(kinds, open);
+  }
+
+  private scheduleFold(ed: vscode.TextEditor) {
+    clearTimeout(this.foldTimer);
+    this.foldTimer = setTimeout(() => void this.fold(ed), 250);
+  }
+
+  /**
+   * Fold the code runs not folded yet, each as a manual folding range made
+   * from exactly its lines. (editor.fold would fold whatever region holds a
+   * line, which can be a whole section from LaTeX Workshop.)
+   */
+  private async fold(ed: vscode.TextEditor) {
+    if (ed !== vscode.window.activeTextEditor || this.folding) return;
+    const doc = ed.document;
+    const k = doc.uri.toString();
+    const runs = this.runs(doc);
+    // By the folded lines' text (not the line above, which may be typed in), so a run is folded once.
+    const keyOf = ([a, b]: [number, number]) => doc.getText(new vscode.Range(a === 0 ? 0 : a + 1, 0, b, Number.MAX_SAFE_INTEGER));
+    const before = this.folded.get(k) ?? new Set<string>();
+    const now = new Set<string>();
+    const fresh: [number, number][] = [];
+    for (const r of runs) {
+      const key = keyOf(r);
+      now.add(key);
+      if (!before.has(key)) fresh.push(r);
+    }
+    this.folded.set(k, now);
+    if (fresh.length === 0) return;
+    this.folding = true;
+    const keep = ed.selections;
+    try {
+      for (const [a, b] of fresh) {
+        ed.selection = new vscode.Selection(a, 0, b, doc.lineAt(b).range.end.character);
+        await vscode.commands.executeCommand("editor.createFoldingRangeFromSelection");
+      }
+    } finally {
+      ed.selections = keep;
+      this.folding = false;
+    }
+  }
+
+  /** Take away the folds live preview made (and any other manual folds). */
+  private async unfoldAll(ed: vscode.TextEditor) {
+    this.folded.delete(ed.document.uri.toString());
+    if (ed !== vscode.window.activeTextEditor) return;
+    const keep = ed.selections;
+    this.folding = true;
+    try {
+      const last = ed.document.lineCount - 1;
+      ed.selection = new vscode.Selection(0, 0, last, ed.document.lineAt(last).range.end.character);
+      await vscode.commands.executeCommand("editor.removeManualFoldingRanges");
+    } finally {
+      ed.selections = keep;
+      this.folding = false;
+    }
   }
 
   dispose() {
