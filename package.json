@@ -1,0 +1,535 @@
+{
+  "name": "latex-review-live",
+  "displayName": "LaTeX Review and Live Preview",
+  "description": "Track changes with accept/reject, review comments, and an Obsidian-style live preview that hides LaTeX code while you edit.",
+  "version": "0.1.0",
+  "publisher": "paivel",
+  "license": "Apache-2.0",
+  "icon": "images/icon.png",
+  "engines": {
+    "vscode": "^1.97.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "latex",
+    "track changes",
+    "review",
+    "comments",
+    "live preview",
+    "wysiwyg"
+  ],
+  "main": "./dist/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onLanguage:latex",
+    "onLanguage:tex"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "latexReview.toggleLivePreview",
+        "title": "Toggle Live Preview",
+        "category": "LaTeX Review",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "latexReview.showSource",
+        "title": "Show Source",
+        "category": "LaTeX Review",
+        "icon": "$(code)"
+      },
+      {
+        "command": "latexReview.showLivePreview",
+        "title": "Show Live Preview",
+        "category": "LaTeX Review",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "latexReview.startTracking",
+        "title": "Start Tracking Changes",
+        "category": "LaTeX Review",
+        "icon": "$(record)"
+      },
+      {
+        "command": "latexReview.stopTracking",
+        "title": "Stop Tracking Changes",
+        "category": "LaTeX Review",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "latexReview.acceptChange",
+        "title": "Accept Change",
+        "category": "LaTeX Review",
+        "icon": "$(check)"
+      },
+      {
+        "command": "latexReview.rejectChange",
+        "title": "Reject Change",
+        "category": "LaTeX Review",
+        "icon": "$(close)"
+      },
+      {
+        "command": "latexReview.acceptAll",
+        "title": "Accept All Changes",
+        "category": "LaTeX Review",
+        "icon": "$(check-all)"
+      },
+      {
+        "command": "latexReview.rejectAll",
+        "title": "Reject All Changes",
+        "category": "LaTeX Review",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "latexReview.nextChange",
+        "title": "Next Change",
+        "category": "LaTeX Review",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "latexReview.previousChange",
+        "title": "Previous Change",
+        "category": "LaTeX Review",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "latexReview.addComment",
+        "title": "Add Comment",
+        "category": "LaTeX Review",
+        "icon": "$(comment)"
+      },
+      {
+        "command": "latexReview.replyComment",
+        "title": "Reply",
+        "category": "LaTeX Review"
+      },
+      {
+        "command": "latexReview.resolveThread",
+        "title": "Resolve",
+        "category": "LaTeX Review",
+        "icon": "$(pass)"
+      },
+      {
+        "command": "latexReview.reopenThread",
+        "title": "Reopen",
+        "category": "LaTeX Review",
+        "icon": "$(issue-reopened)"
+      },
+      {
+        "command": "latexReview.deleteThread",
+        "title": "Delete Thread",
+        "category": "LaTeX Review",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "latexReview.deleteComment",
+        "title": "Delete Comment",
+        "category": "LaTeX Review",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "latexReview.editComment",
+        "title": "Edit Comment",
+        "category": "LaTeX Review",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "latexReview.saveComment",
+        "title": "Save",
+        "category": "LaTeX Review"
+      },
+      {
+        "command": "latexReview.cancelEditComment",
+        "title": "Cancel",
+        "category": "LaTeX Review"
+      },
+      {
+        "command": "latexReview.exportMarkedUp",
+        "title": "Export Marked-Up Copy (changes package)",
+        "category": "LaTeX Review"
+      },
+      {
+        "command": "latexReview.revealChange",
+        "title": "Go to Change",
+        "category": "LaTeX Review"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "latexReview.toggleLivePreview",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p",
+        "when": "editorTextFocus && editorLangId =~ /^(latex|tex)$/"
+      },
+      {
+        "command": "latexReview.nextChange",
+        "key": "ctrl+alt+]",
+        "mac": "cmd+alt+]",
+        "when": "editorTextFocus && latexReview.tracking"
+      },
+      {
+        "command": "latexReview.previousChange",
+        "key": "ctrl+alt+[",
+        "mac": "cmd+alt+[",
+        "when": "editorTextFocus && latexReview.tracking"
+      },
+      {
+        "command": "latexReview.addComment",
+        "key": "ctrl+alt+m",
+        "mac": "cmd+alt+m",
+        "when": "editorTextFocus && editorLangId =~ /^(latex|tex)$/"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "latexReview",
+          "title": "LaTeX Review",
+          "icon": "$(git-pull-request)"
+        }
+      ]
+    },
+    "views": {
+      "latexReview": [
+        {
+          "id": "latexReview.changes",
+          "name": "Changes"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "latexReview.changes",
+        "contents": "Changes are not tracked in this document.\n[Start Tracking Changes](command:latexReview.startTracking)",
+        "when": "!latexReview.tracking"
+      },
+      {
+        "view": "latexReview.changes",
+        "contents": "No changes yet. Edit the document and each change appears here to accept or reject.",
+        "when": "latexReview.tracking"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "latexReview.showLivePreview",
+          "when": "editorLangId =~ /^(latex|tex)$/ && !latexReview.livePreview",
+          "group": "navigation@50"
+        },
+        {
+          "command": "latexReview.showSource",
+          "when": "editorLangId =~ /^(latex|tex)$/ && latexReview.livePreview",
+          "group": "navigation@50"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "latexReview.acceptChange",
+          "when": "latexReview.tracking",
+          "group": "latexReview@1"
+        },
+        {
+          "command": "latexReview.rejectChange",
+          "when": "latexReview.tracking",
+          "group": "latexReview@2"
+        },
+        {
+          "command": "latexReview.addComment",
+          "when": "editorLangId =~ /^(latex|tex)$/",
+          "group": "latexReview@3"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "latexReview.startTracking",
+          "when": "view == latexReview.changes && !latexReview.tracking",
+          "group": "navigation@1"
+        },
+        {
+          "command": "latexReview.acceptAll",
+          "when": "view == latexReview.changes && latexReview.tracking",
+          "group": "navigation@1"
+        },
+        {
+          "command": "latexReview.rejectAll",
+          "when": "view == latexReview.changes && latexReview.tracking",
+          "group": "navigation@2"
+        },
+        {
+          "command": "latexReview.stopTracking",
+          "when": "view == latexReview.changes && latexReview.tracking",
+          "group": "navigation@3"
+        },
+        {
+          "command": "latexReview.exportMarkedUp",
+          "when": "view == latexReview.changes && latexReview.tracking",
+          "group": "more@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "latexReview.acceptChange",
+          "when": "view == latexReview.changes && viewItem == change",
+          "group": "inline@1"
+        },
+        {
+          "command": "latexReview.rejectChange",
+          "when": "view == latexReview.changes && viewItem == change",
+          "group": "inline@2"
+        }
+      ],
+      "comments/commentThread/title": [
+        {
+          "command": "latexReview.resolveThread",
+          "when": "commentController == latexReview && commentThread == open",
+          "group": "inline@1"
+        },
+        {
+          "command": "latexReview.reopenThread",
+          "when": "commentController == latexReview && commentThread == resolved",
+          "group": "inline@1"
+        },
+        {
+          "command": "latexReview.deleteThread",
+          "when": "commentController == latexReview && !commentThreadIsEmpty",
+          "group": "inline@2"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "latexReview.replyComment",
+          "when": "commentController == latexReview",
+          "group": "inline"
+        }
+      ],
+      "comments/comment/title": [
+        {
+          "command": "latexReview.editComment",
+          "when": "commentController == latexReview && comment == mine",
+          "group": "inline@1"
+        },
+        {
+          "command": "latexReview.deleteComment",
+          "when": "commentController == latexReview",
+          "group": "inline@2"
+        }
+      ],
+      "comments/comment/context": [
+        {
+          "command": "latexReview.cancelEditComment",
+          "when": "commentController == latexReview",
+          "group": "inline@1"
+        },
+        {
+          "command": "latexReview.saveComment",
+          "when": "commentController == latexReview",
+          "group": "inline@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "latexReview.acceptChange",
+          "when": "latexReview.tracking"
+        },
+        {
+          "command": "latexReview.rejectChange",
+          "when": "latexReview.tracking"
+        },
+        {
+          "command": "latexReview.acceptAll",
+          "when": "latexReview.tracking"
+        },
+        {
+          "command": "latexReview.rejectAll",
+          "when": "latexReview.tracking"
+        },
+        {
+          "command": "latexReview.nextChange",
+          "when": "latexReview.tracking"
+        },
+        {
+          "command": "latexReview.previousChange",
+          "when": "latexReview.tracking"
+        },
+        {
+          "command": "latexReview.stopTracking",
+          "when": "latexReview.tracking"
+        },
+        {
+          "command": "latexReview.exportMarkedUp",
+          "when": "latexReview.tracking"
+        },
+        {
+          "command": "latexReview.replyComment",
+          "when": "false"
+        },
+        {
+          "command": "latexReview.resolveThread",
+          "when": "false"
+        },
+        {
+          "command": "latexReview.reopenThread",
+          "when": "false"
+        },
+        {
+          "command": "latexReview.deleteThread",
+          "when": "false"
+        },
+        {
+          "command": "latexReview.deleteComment",
+          "when": "false"
+        },
+        {
+          "command": "latexReview.editComment",
+          "when": "false"
+        },
+        {
+          "command": "latexReview.saveComment",
+          "when": "false"
+        },
+        {
+          "command": "latexReview.cancelEditComment",
+          "when": "false"
+        },
+        {
+          "command": "latexReview.revealChange",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "LaTeX Review and Live Preview",
+      "properties": {
+        "latexReview.author": {
+          "type": "string",
+          "default": "",
+          "description": "Your name on comments. Empty: git user.name, else your account name."
+        },
+        "latexReview.codeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Accept / Reject above lines with tracked changes."
+        },
+        "latexReview.livePreview.default": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open LaTeX documents in live preview."
+        },
+        "latexReview.livePreview.reveal": {
+          "type": "string",
+          "default": "element",
+          "enum": [
+            "element",
+            "line",
+            "never"
+          ],
+          "enumDescriptions": [
+            "Show the code of the command the cursor is in, as Obsidian does.",
+            "Show the code of the whole line the cursor is on.",
+            "Keep code hidden even under the cursor."
+          ],
+          "description": "When live preview shows the LaTeX code under the cursor."
+        }
+      }
+    },
+    "colors": [
+      {
+        "id": "latexReview.insertedForeground",
+        "description": "Text inserted while tracking changes.",
+        "defaults": {
+          "light": "#1a56c9",
+          "dark": "#6ea8ff",
+          "highContrast": "#6ea8ff"
+        }
+      },
+      {
+        "id": "latexReview.insertedBackground",
+        "description": "Background of inserted text.",
+        "defaults": {
+          "light": "#1a56c91a",
+          "dark": "#6ea8ff1f",
+          "highContrast": "#00000000"
+        }
+      },
+      {
+        "id": "latexReview.deletedForeground",
+        "description": "Deleted text, shown struck through.",
+        "defaults": {
+          "light": "#c62828",
+          "dark": "#ff7b72",
+          "highContrast": "#ff7b72"
+        }
+      },
+      {
+        "id": "latexReview.commentBackground",
+        "description": "Background of text that has a comment.",
+        "defaults": {
+          "light": "#f5c51840",
+          "dark": "#f5c51830",
+          "highContrast": "#00000000"
+        }
+      },
+      {
+        "id": "latexReview.previewMuted",
+        "description": "LaTeX that live preview keeps visible but dims, such as comments and labels.",
+        "defaults": {
+          "light": "#8a8a8a",
+          "dark": "#7f7f7f",
+          "highContrast": "#aaaaaa"
+        }
+      },
+      {
+        "id": "latexReview.previewHeading",
+        "description": "Section headings in live preview.",
+        "defaults": {
+          "light": "#1a56c9",
+          "dark": "#7fb2ff",
+          "highContrast": "#ffffff"
+        }
+      },
+      {
+        "id": "latexReview.previewMath",
+        "description": "Math in live preview.",
+        "defaults": {
+          "light": "#7b3fa0",
+          "dark": "#d2a8ff",
+          "highContrast": "#ffffff"
+        }
+      },
+      {
+        "id": "latexReview.previewReference",
+        "description": "Citations and cross-references in live preview.",
+        "defaults": {
+          "light": "#0b7a75",
+          "dark": "#56d4c8",
+          "highContrast": "#ffffff"
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/extension.js",
+    "check": "tsc -p . && vitest run",
+    "package": "npm run check && npm run build -- --minify && vsce package --no-dependencies --allow-missing-repository"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.97.0",
+    "@vscode/vsce": "^4.1.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "diff": "^9.0.0"
+  }
+}
