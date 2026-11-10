@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6
+
+- ✅ Accept and ❌ Reject at the end of each changed line, clickable (`latexReview.lineButtons`).
+
 ## 0.1.5
 
 - Live preview: \\begin{…} and \\end{…} always stay in view (dimmed).

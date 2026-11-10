@@ -244,6 +244,10 @@ export class TrackChanges implements vscode.Disposable {
         onDidChangeCodeLenses: this.codeLensChanged.event,
         provideCodeLenses: (doc) => this.lenses(doc),
       }),
+      vscode.languages.registerInlayHintsProvider(sel, {
+        onDidChangeInlayHints: this.codeLensChanged.event,
+        provideInlayHints: (doc, range) => this.sideButtons(doc, range),
+      }),
       vscode.languages.registerHoverProvider(sel, { provideHover: (doc, pos) => this.hover(doc, pos) }),
       vscode.languages.registerCodeActionsProvider(sel, { provideCodeActions: (doc, range) => this.actions(doc, range) }),
       vscode.window.registerWebviewViewProvider("latexReview.changes", this.pane, { webviewOptions: { retainContextWhenHidden: true } }),
@@ -516,6 +520,39 @@ export class TrackChanges implements vscode.Disposable {
         }
         if (cs.length > 4) out.push(new vscode.CodeLens(range, { title: `+${cs.length - 4} more`, command: "latexReview.nextChange" }));
       }
+    }
+    return out;
+  }
+
+  /** ✅ ❌ at the end of each line with a change: click to accept or reject it. */
+  private sideButtons(doc: vscode.TextDocument, range: vscode.Range): vscode.InlayHint[] {
+    if (!vscode.workspace.getConfiguration("latexReview").get<boolean>("lineButtons", true)) return [];
+    const r = this.store.peek(doc);
+    if (!r?.tracking) return [];
+    const byLine = new Map<number, Change[]>();
+    for (const c of r.changes) {
+      const line = doc.positionAt(c.inserted ? c.curEnd : c.curStart).line;
+      if (line < range.start.line || line > range.end.line) continue;
+      byLine.set(line, [...(byLine.get(line) ?? []), c]);
+    }
+    const out: vscode.InlayHint[] = [];
+    for (const [line, cs] of byLine) {
+      const parts: vscode.InlayHintLabelPart[] = [];
+      cs.forEach((c, i) => {
+        const ref = this.ref(doc, c);
+        const what = cs.length > 1 ? ` ${describe(c)}` : "";
+        if (i > 0) parts.push(new vscode.InlayHintLabelPart("   "));
+        const ok = new vscode.InlayHintLabelPart(`✅${what}`);
+        ok.command = { title: "Accept", command: "latexReview.acceptChange", arguments: [ref] };
+        ok.tooltip = "Accept this change";
+        const no = new vscode.InlayHintLabelPart(" ❌");
+        no.command = { title: "Reject", command: "latexReview.rejectChange", arguments: [ref] };
+        no.tooltip = "Reject this change";
+        parts.push(ok, no);
+      });
+      const hint = new vscode.InlayHint(doc.lineAt(line).range.end, parts);
+      hint.paddingLeft = true;
+      out.push(hint);
     }
     return out;
   }

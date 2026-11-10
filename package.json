@@ -2,7 +2,7 @@
   "name": "latex-review-live",
   "displayName": "LaTeX Review and Live Preview",
   "description": "Track changes with accept/reject, review comments, and an Obsidian-style live preview that hides LaTeX code while you edit.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
@@ -425,6 +425,11 @@
           "type": "boolean",
           "default": true,
           "description": "In live preview, keep the preamble and anything after \\end{document} read-only (edits there are undone at once). Switch to Source to edit them."
+        },
+        "latexReview.lineButtons": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show ✅ Accept and ❌ Reject at the end of each line with a tracked change."
         }
       }
     },
