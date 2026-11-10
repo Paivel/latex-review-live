@@ -79,6 +79,8 @@ export class Comments implements vscode.Disposable {
         this.setMode(c, vscode.CommentMode.Preview);
       }),
       vscode.commands.registerCommand("latexReview.saveComment", (c: NoteComment) => this.saveEdit(c)),
+      vscode.commands.registerCommand("latexReview.paneComment", (a: { uri: string; start: number; end: number; text: string }) => this.paneComment(a)),
+      vscode.commands.registerCommand("latexReview.paneThread", (a: { uri: string; id: string; action: string; text?: string }) => this.paneThread(a)),
     );
     void this.resolveAuthor().then(() => this.refreshOwnership());
     for (const ed of vscode.window.visibleTextEditors) if (isTex(ed.document)) void store.get(ed.document).then((r) => this.sync(r));
@@ -148,6 +150,12 @@ export class Comments implements vscode.Disposable {
         th.comments = t.comments.map((c) => new NoteComment(c, th!, this.author()));
       } else if (!th.range || !th.range.isEqual(range)) {
         th.range = range;
+      }
+      // Replies or edits made from the review pane.
+      const shown = th.comments.map((c) => (c instanceof NoteComment ? c.stored : undefined));
+      if (shown.length !== t.comments.length || shown.some((c, i) => c !== t.comments[i] || c?.body !== (th!.comments[i] as NoteComment).savedBody)) {
+        const thread = th;
+        thread.comments = t.comments.map((c) => new NoteComment(c, thread, this.author()));
       }
       th.label = t.resolved ? "Resolved" : undefined;
       th.contextValue = t.resolved ? "resolved" : "open";
@@ -273,6 +281,53 @@ export class Comments implements vscode.Disposable {
       c.body = new vscode.MarkdownString(text);
     });
     this.setMode(c, vscode.CommentMode.Preview);
+  }
+
+  /** A new thread from the review pane, on the given text. */
+  private async paneComment(a: { uri: string; start: number; end: number; text: string }) {
+    const text = a.text.trim();
+    if (!text) return;
+    const doc = await this.docOf(vscode.Uri.parse(a.uri));
+    const r = await this.store.get(doc);
+    r.data.threads.push({
+      id: newId(),
+      start: a.start,
+      end: a.end,
+      quote: doc.getText().slice(a.start, a.end),
+      resolved: false,
+      comments: [{ id: newId(), author: this.author(), body: text, created: new Date().toISOString() }],
+    });
+    r.data.threads.sort((x, y) => x.start - y.start);
+    await this.store.persist(r, doc);
+  }
+
+  /** Reply, resolve, reopen, delete or show a thread, from the review pane. */
+  private async paneThread(a: { uri: string; id: string; action: string; text?: string }) {
+    const doc = await this.docOf(vscode.Uri.parse(a.uri));
+    const r = await this.store.get(doc);
+    const t = r.data.threads.find((x) => x.id === a.id);
+    if (!t) return;
+    if (a.action === "reveal") {
+      const ed = await vscode.window.showTextDocument(doc, { preserveFocus: false });
+      const range = this.rangeOf(doc, t);
+      ed.selection = new vscode.Selection(range.start, range.end);
+      ed.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+      const th = this.live.get(a.uri)?.get(a.id);
+      if (th) th.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
+      return;
+    }
+    if (a.action === "reply") {
+      const text = (a.text ?? "").trim();
+      if (!text) return;
+      t.comments.push({ id: newId(), author: this.author(), body: text, created: new Date().toISOString() });
+    } else if (a.action === "resolve" || a.action === "reopen") {
+      t.resolved = a.action === "resolve";
+    } else if (a.action === "delete") {
+      const ok = await vscode.window.showWarningMessage("Delete this comment thread?", { modal: true }, "Delete");
+      if (ok !== "Delete") return;
+      r.data.threads = r.data.threads.filter((x) => x !== t);
+    }
+    await this.store.persist(r, doc);
   }
 
   dispose() {

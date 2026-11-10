@@ -4,6 +4,7 @@ import { Change, changeAt, computeChanges, kindOf } from "./diff";
 import { ReviewFile, emptyReview, isEmptyReview, parseReview, serializeReview, shiftRange, reanchor, StoredThread } from "./model";
 import { markUp } from "./markup";
 import { applyOwnEdit } from "../own-edits";
+import { ReviewPane, paneChange } from "./pane";
 
 const isTex = (doc: vscode.TextDocument) => doc.languageId === "latex" || doc.languageId === "tex";
 
@@ -216,6 +217,7 @@ export class TrackChanges implements vscode.Disposable {
   private treeChanged = new vscode.EventEmitter<void>();
   private status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
   private gutter: Record<"insert" | "delete" | "replace", vscode.TextEditorDecorationType>;
+  private pane = new ReviewPane((m) => void this.fromPane(m));
 
   constructor(private store: ReviewStore, extensionUri: vscode.Uri) {
     const icon = (name: string) =>
@@ -244,7 +246,9 @@ export class TrackChanges implements vscode.Disposable {
       }),
       vscode.languages.registerHoverProvider(sel, { provideHover: (doc, pos) => this.hover(doc, pos) }),
       vscode.languages.registerCodeActionsProvider(sel, { provideCodeActions: (doc, range) => this.actions(doc, range) }),
-      vscode.window.createTreeView("latexReview.changes", { treeDataProvider: this.tree() }),
+      vscode.window.registerWebviewViewProvider("latexReview.changes", this.pane, { webviewOptions: { retainContextWhenHidden: true } }),
+      this.treeChanged.event(() => this.updatePane()),
+      vscode.window.onDidChangeTextEditorSelection((e) => e.textEditor === vscode.window.activeTextEditor && this.updatePane()),
       vscode.workspace.onDidChangeConfiguration((e) => e.affectsConfiguration("latexReview.codeLens") && this.codeLensChanged.fire()),
       vscode.commands.registerCommand("latexReview.startTracking", () => this.start()),
       vscode.commands.registerCommand("latexReview.stopTracking", () => this.stop()),
@@ -307,9 +311,13 @@ export class TrackChanges implements vscode.Disposable {
     }
   }
 
+  private lastTex: vscode.TextEditor | undefined;
+  /** The LaTeX editor in front, or the last one while focus is in the review pane. */
   private activeTex(): vscode.TextEditor | undefined {
     const ed = vscode.window.activeTextEditor;
-    return ed && isTex(ed.document) ? ed : undefined;
+    if (ed && isTex(ed.document)) return (this.lastTex = ed);
+    if (this.lastTex && vscode.window.visibleTextEditors.includes(this.lastTex)) return this.lastTex;
+    return undefined;
   }
 
   private updateContext() {
@@ -346,6 +354,8 @@ export class TrackChanges implements vscode.Disposable {
     r.data.trackingSince = new Date().toISOString();
     this.store.recompute(r, ed.document);
     await this.store.persist(r, ed.document);
+    void vscode.commands.executeCommand("latexReview.changes.focus").then(undefined, () => undefined);
+    void vscode.window.showTextDocument(ed.document, ed.viewColumn);
   }
 
   private async stop() {
@@ -479,7 +489,7 @@ export class TrackChanges implements vscode.Disposable {
   }
 
   private lenses(doc: vscode.TextDocument): vscode.CodeLens[] {
-    if (!vscode.workspace.getConfiguration("latexReview").get<boolean>("codeLens", true)) return [];
+    if (!vscode.workspace.getConfiguration("latexReview").get<boolean>("codeLens", false)) return [];
     const r = this.store.peek(doc);
     if (!r?.tracking) return [];
     const byLine = new Map<number, Change[]>();
@@ -542,25 +552,61 @@ export class TrackChanges implements vscode.Disposable {
     return [acc, rej];
   }
 
-  private tree(): vscode.TreeDataProvider<ChangeRef & { label: string; line: number; kind: string }> {
-    return {
-      onDidChangeTreeData: this.treeChanged.event,
-      getChildren: (el) => {
-        if (el) return [];
-        const ed = this.activeTex();
-        const r = ed && this.store.peek(ed.document);
-        if (!ed || !r?.tracking) return [];
-        return r.changes.map((c) => ({ ...this.ref(ed.document, c), label: describe(c), line: ed.document.positionAt(c.curStart).line + 1, kind: kindOf(c) }));
-      },
-      getTreeItem: (el) => {
-        const item = new vscode.TreeItem(el.label);
-        item.description = `line ${el.line}`;
-        item.contextValue = "change";
-        item.iconPath = new vscode.ThemeIcon(el.kind === "insert" ? "diff-added" : el.kind === "delete" ? "diff-removed" : "diff-modified");
-        item.command = { title: "Go to Change", command: "latexReview.revealChange", arguments: [el] };
-        return item;
-      },
-    };
+  private updatePane() {
+    const ed = this.activeTex();
+    const r = ed && this.store.peek(ed.document);
+    if (!ed || !r) {
+      this.pane.show({ tracking: false, threads: [], hasSelection: false, changes: [], current: -1 });
+      return;
+    }
+    const doc = ed.document;
+    const threads = r.data.threads.map((t) => ({
+      uri: doc.uri.toString(),
+      id: t.id,
+      line: doc.positionAt(t.start).line + 1,
+      quote: doc.getText().slice(t.start, t.end).replace(/\s+/g, " ").slice(0, 80),
+      resolved: t.resolved,
+      comments: t.comments.map((c) => ({ author: c.author, body: c.body, when: c.created ? new Date(c.created).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" }) : "" })),
+    }));
+    const hasSelection = !ed.selection.isEmpty;
+    if (!r.tracking) {
+      this.pane.show({ tracking: false, threads, hasSelection, changes: [], current: -1 });
+      return;
+    }
+    const here = doc.offsetAt(ed.selection.active);
+    const changes = r.changes.map((c) => paneChange(doc, c));
+    this.pane.show({ tracking: true, threads, hasSelection, changes, current: r.changes.findIndex((c) => here >= c.curStart && here <= c.curEnd) });
+  }
+
+  private async fromPane(m: { type: string; change?: ChangeRef; thread?: string; text?: string }) {
+    const ed = this.activeTex();
+    if (m.type === "comment" && ed) {
+      let range: vscode.Range = ed.selection;
+      if (range.isEmpty) range = ed.document.getWordRangeAtPosition(range.start) ?? ed.document.lineAt(range.start.line).range;
+      const doc = ed.document;
+      return vscode.commands.executeCommand("latexReview.paneComment", { uri: doc.uri.toString(), start: doc.offsetAt(range.start), end: doc.offsetAt(range.end), text: m.text ?? "" });
+    }
+    if (m.thread && ed) {
+      const action = { showThread: "reveal", deleteThread: "delete" }[m.type] ?? m.type;
+      return vscode.commands.executeCommand("latexReview.paneThread", { uri: ed.document.uri.toString(), id: m.thread, action, text: m.text });
+    }
+    const ref = m.change ? { uri: m.change.uri, curStart: m.change.curStart, curEnd: m.change.curEnd } : undefined;
+    switch (m.type) {
+      case "accept":
+        return this.decide(true, ref);
+      case "reject":
+        return this.decide(false, ref);
+      case "acceptAll":
+        return this.decideAll(true);
+      case "rejectAll":
+        return this.decideAll(false);
+      case "start":
+        return this.start();
+      case "stop":
+        return this.stop();
+      case "reveal":
+        if (ref) return this.reveal(ref);
+    }
   }
 
   private async exportMarkedUp() {

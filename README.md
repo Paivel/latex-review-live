@@ -13,11 +13,11 @@ Click **Track changes** in the status bar (or run *LaTeX Review: Start Tracking 
 
 - inserted text is blue and underlined, deleted text is shown in red, struck through, where it was;
 - a mark in the left margin shows each changed line (green: added, red: deleted, orange: rewritten);
-- every change has **✅ Accept / ❌ Reject** above its line, in its hover and in the lightbulb (`Ctrl+.` / `Cmd+.`); select a passage to accept or reject all changes in it;
-- the **LaTeX Review** view in the activity bar lists all changes, with Accept All and Reject All;
+- the **Review** pane on the right (the secondary side bar) shows every change as a card with a green **Accept** and a red **Reject**, plus Accept All and Reject All; the change at the cursor is outlined, and clicking a card jumps to it;
+- each change also has Accept / Reject in its hover and in the lightbulb (`Ctrl+.` / `Cmd+.`); select a passage to accept or reject all changes in it. `latexReview.codeLens` adds them above the line as well;
 - `Ctrl+Alt+]` / `Ctrl+Alt+[` (`Cmd+Alt+]` / `Cmd+Alt+[` on Mac) go to the next or previous change.
 
-**Comments**: select text and press `Ctrl+Alt+M` (`Cmd+Alt+M`), or click `+` in the gutter. Threads take replies, can be resolved, edited and deleted. Commented text is highlighted.
+**Comments**: select text, write in the Comments box of the Review pane and click Add comment; reply, resolve and delete there too. Or press `Ctrl+Alt+M` (`Cmd+Alt+M`), or click `+` in the gutter. Threads take replies, can be resolved, edited and deleted. Commented text is highlighted.
 
 **Export Marked-Up Copy** (in the view's `…` menu) writes `name-review.tex` with the changes as `\added`, `\deleted` and `\replaced` and comments as `\comment` from the [changes](https://ctan.org/pkg/changes) package, so co-authors without VS Code can read the review in the PDF.
 
@@ -49,7 +49,7 @@ The code of the command under the cursor is shown while you edit it, as in Obsid
 | Setting | Default | |
 |---|---|---|
 | `latexReview.author` | git `user.name` | Your name on comments |
-| `latexReview.codeLens` | `true` | Accept / Reject above lines with changes |
+| `latexReview.codeLens` | `false` | Accept / Reject above lines with changes too |
 | `latexReview.livePreview.default` | `false` | Open LaTeX documents in live preview |
 | `latexReview.livePreview.reveal` | `element` | `element`, `line` or `never` |
 | `latexReview.livePreview.foldCode` | `true` | Fold lines that hold only code |

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4
+
+- Review pane on the right: each change as a card with green Accept and red Reject; the change at the cursor is outlined.
+- Accept / Reject above lines is now off by default (`latexReview.codeLens`).
+- Comments in the same pane: write one on the selected text, reply, resolve, reopen, delete.
+
 ## 0.1.3
 
 - Live preview keeps the preamble and anything after \end{document} read-only; switch to Source to edit them.
