@@ -57,6 +57,8 @@ export class LivePreview implements vscode.Disposable {
   /** Per document: the code runs we have folded, by their text, so each is folded once. */
   private folded = new Map<string, Set<string>>();
   private foldTimer: NodeJS.Timeout | undefined;
+  private mouseTimer: NodeJS.Timeout | undefined;
+  private lastSelection = 0;
   private folding = false;
 
   constructor(private state: vscode.Memento) {
@@ -84,7 +86,15 @@ export class LivePreview implements vscode.Disposable {
       vscode.commands.registerCommand("latexReview.showSource", () => this.set(false)),
       vscode.window.onDidChangeVisibleTextEditors(() => this.repaintAll()),
       vscode.window.onDidChangeActiveTextEditor(() => this.updateStatus()),
-      vscode.window.onDidChangeTextEditorSelection((e) => !this.folding && this.isOn(e.textEditor.document) && this.paint(e.textEditor)),
+      vscode.window.onDidChangeTextEditorSelection((e) => {
+        if (this.folding || !this.isOn(e.textEditor.document)) return;
+        this.lastSelection = Date.now();
+        clearTimeout(this.mouseTimer);
+        // Showing the code under a click moves the text; wait until a double or
+        // triple click is over, or the second click would land on other text.
+        if (e.kind === vscode.TextEditorSelectionChangeKind.Mouse) this.mouseTimer = setTimeout(() => this.paint(e.textEditor), 450);
+        else this.paint(e.textEditor);
+      }),
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (!this.isOn(e.document) || e.contentChanges.length === 0) return;
         const key = e.document.uri.toString();
@@ -242,7 +252,7 @@ export class LivePreview implements vscode.Disposable {
 
   private scheduleFold(ed: vscode.TextEditor) {
     clearTimeout(this.foldTimer);
-    this.foldTimer = setTimeout(() => void this.fold(ed), 250);
+    this.foldTimer = setTimeout(() => void this.fold(ed), 700);
   }
 
   /**
@@ -252,6 +262,11 @@ export class LivePreview implements vscode.Disposable {
    */
   private async fold(ed: vscode.TextEditor) {
     if (ed !== vscode.window.activeTextEditor || this.folding) return;
+    // Folding briefly moves the selection: never while the user is clicking, dragging or selecting.
+    if (Date.now() - this.lastSelection < 650 || ed.selections.some((s) => !s.isEmpty)) {
+      if (ed.selections.every((s) => s.isEmpty)) this.scheduleFold(ed);
+      return;
+    }
     const doc = ed.document;
     const k = doc.uri.toString();
     const runs = this.runs(doc);
@@ -298,6 +313,8 @@ export class LivePreview implements vscode.Disposable {
 
   dispose() {
     for (const t of this.timers.values()) clearTimeout(t);
+    clearTimeout(this.foldTimer);
+    clearTimeout(this.mouseTimer);
     this.subs.forEach((s) => s.dispose());
   }
 }

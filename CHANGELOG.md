@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- Double and triple click work again in live preview: code under a click is shown only once the clicking is over.
+- With the cursor in a block of code lines, only its line opens; the rest stays folded.
+
 ## 0.1.1
 
 - Accept and Reject in green and red, and a mark in the margin on each changed line.

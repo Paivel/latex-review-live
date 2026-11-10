@@ -40,12 +40,19 @@ describe("code-only lines", () => {
     ]);
   });
 
-  it("keeps the run under the cursor open", () => {
+  it("keeps the cursor's line open and folds the rest of its run", () => {
     expect(codeRuns(kinds(src), new Set([4]))).toEqual([
       [0, 2],
+      [4, 5],
       [7, 8],
       [9, 11],
       [13, 14],
+    ]);
+    // Cursor in the middle of the preamble: above it and below it fold.
+    const pre = ["\\documentclass{article}", "\\a", "\\b", "\\c", "\\d", "\\begin{document}", "Text"].join("\n");
+    expect(codeRuns(kinds(pre), new Set([3]))).toEqual([
+      [0, 2],
+      [3, 5],
     ]);
   });
 

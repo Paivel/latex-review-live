@@ -48,11 +48,19 @@ export function lineKinds(text: string, pieces: Piece[], bodyStart: number): Lin
 /**
  * Folding ranges that hide runs of code-only lines (blank lines inside a run
  * go with it). A range starts on the line above the run, which stays in view,
- * since VS Code always shows a folded range's first line. Runs on a line in
- * `keepOpen` are left alone, so the line under the cursor is always shown.
+ * since VS Code always shows a folded range's first line. Lines in `keepOpen`
+ * (the cursor's) stay in view: a run is split around them.
  */
 export function codeRuns(kinds: LineKind[], keepOpen: Set<number>): [number, number][] {
   const out: [number, number][] = [];
+  const push = (first: number, last: number) => {
+    // Trim blank lines at the ends of a piece.
+    while (first <= last && kinds[first] === "blank") first++;
+    while (last >= first && kinds[last] === "blank") last--;
+    if (first > last) return;
+    const start = first === 0 ? 0 : first - 1;
+    if (last > start) out.push([start, last]);
+  };
   let i = 0;
   while (i < kinds.length) {
     if (kinds[i] !== "code") {
@@ -65,13 +73,15 @@ export function codeRuns(kinds: LineKind[], keepOpen: Set<number>): [number, num
       if (kinds[j] === "code") last = j;
       j++;
     }
-    const first = i;
+    let from = i;
+    for (let l = i; l <= last; l++) {
+      if (keepOpen.has(l)) {
+        push(from, l - 1);
+        from = l + 1;
+      }
+    }
+    push(from, last);
     i = j;
-    let open = false;
-    for (let l = first; l <= last; l++) if (keepOpen.has(l)) open = true;
-    if (open) continue;
-    const start = first === 0 ? 0 : first - 1;
-    if (last > start) out.push([start, last]);
   }
   return out;
 }
