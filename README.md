@@ -40,6 +40,8 @@ Click **Source** in the status bar, the eye button in the editor title, or press
 
 Lines that hold only code (`\label`, `\begin{itemize}`, `\centering`, comments, the preamble) are folded away; the line the cursor is on always stays open. Turn this off with `latexReview.livePreview.foldCode`.
 
+The preamble and anything after `\end{document}` are read-only in live preview (`latexReview.livePreview.protectPreamble`); switch to Source to edit them.
+
 The code of the command under the cursor is shown while you edit it, as in Obsidian. `latexReview.livePreview.reveal` switches this to the whole line, or off. The preamble and commands it does not know are left as source. Display math is coloured and its symbols replaced, but it is not typeset.
 
 ## Settings
@@ -51,6 +53,7 @@ The code of the command under the cursor is shown while you edit it, as in Obsid
 | `latexReview.livePreview.default` | `false` | Open LaTeX documents in live preview |
 | `latexReview.livePreview.reveal` | `element` | `element`, `line` or `never` |
 | `latexReview.livePreview.foldCode` | `true` | Fold lines that hold only code |
+| `latexReview.livePreview.protectPreamble` | `true` | Preamble read-only in live preview |
 
 Colours (inserted, deleted, comment, heading, math, references) can be changed under `workbench.colorCustomizations`, e.g. `"latexReview.insertedForeground": "#1a56c9"`.
 

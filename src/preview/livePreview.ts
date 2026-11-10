@@ -3,6 +3,8 @@ import * as path from "path";
 import { Piece, Refs, Style, noRefs, parseLatex } from "./parse";
 import { readAux } from "./aux";
 import { codeRuns, lineKinds } from "./fold";
+import { revertsOutsideBody } from "./protect";
+import { isOwnEdit } from "../own-edits";
 
 const isTex = (doc: vscode.TextDocument) => doc.languageId === "latex" || doc.languageId === "tex";
 
@@ -59,6 +61,9 @@ export class LivePreview implements vscode.Disposable {
   private foldTimer: NodeJS.Timeout | undefined;
   private mouseTimer: NodeJS.Timeout | undefined;
   private lastSelection = 0;
+  /** Text of each live document as of the last change, to put back edits outside the body. */
+  private snapshots = new Map<string, string>();
+  private ownEdit = new Map<string, number>();
   private folding = false;
 
   constructor(private state: vscode.Memento) {
@@ -96,7 +101,12 @@ export class LivePreview implements vscode.Disposable {
         else this.paint(e.textEditor);
       }),
       vscode.workspace.onDidChangeTextDocument((e) => {
-        if (!this.isOn(e.document) || e.contentChanges.length === 0) return;
+        if (!this.isOn(e.document)) {
+          this.snapshots.delete(e.document.uri.toString());
+          return;
+        }
+        if (e.contentChanges.length === 0) return;
+        this.protect(e);
         const key = e.document.uri.toString();
         clearTimeout(this.timers.get(key));
         this.timers.set(
@@ -114,7 +124,10 @@ export class LivePreview implements vscode.Disposable {
         }
         if (e.affectsConfiguration("latexReview.livePreview")) this.repaintAll();
       }),
-      vscode.workspace.onDidCloseTextDocument((d) => this.cache.delete(d.uri.toString())),
+      vscode.workspace.onDidCloseTextDocument((d) => {
+        this.cache.delete(d.uri.toString());
+        this.snapshots.delete(d.uri.toString());
+      }),
     );
     this.repaintAll();
   }
@@ -144,6 +157,7 @@ export class LivePreview implements vscode.Disposable {
       this.off.add(k);
       this.on.delete(k);
     }
+    this.snapshots.set(k, ed.document.getText());
     if (!live) await this.unfoldAll(ed);
     else this.folded.delete(k);
     await this.state.update("latexReview.liveDocs", [...this.on].slice(-200));
@@ -205,6 +219,7 @@ export class LivePreview implements vscode.Disposable {
       return;
     }
     const pieces = this.pieces(doc);
+    if (!this.snapshots.has(doc.uri.toString())) this.snapshots.set(doc.uri.toString(), doc.getText());
     const mode = vscode.workspace.getConfiguration("latexReview").get<string>("livePreview.reveal", "element");
     const sel = ed.selections.map((s) => {
       if (mode === "line") return [doc.offsetAt(doc.lineAt(s.start.line).range.start), doc.offsetAt(doc.lineAt(s.end.line).range.end)];
@@ -230,6 +245,33 @@ export class LivePreview implements vscode.Disposable {
     ed.setDecorations(this.hideType, hidden);
     for (const [s, t] of this.styleTypes) ed.setDecorations(t, styled.get(s) ?? []);
     if (ed === vscode.window.activeTextEditor) this.scheduleFold(ed);
+  }
+
+  /**
+   * In live preview only the body is written in: an edit to the preamble or
+   * after \end{document} is put back at once.
+   */
+  private protect(e: vscode.TextDocumentChangeEvent) {
+    const doc = e.document;
+    const k = doc.uri.toString();
+    const before = this.snapshots.get(k);
+    this.snapshots.set(k, doc.getText());
+    if (this.ownEdit.get(k) === doc.version) {
+      this.ownEdit.delete(k);
+      return;
+    }
+    if (before === undefined || isOwnEdit(doc.uri) || !vscode.workspace.getConfiguration("latexReview").get<boolean>("livePreview.protectPreamble", true)) return;
+    // Only what the user types here; leave edits from other extensions, git and the like alone.
+    if (vscode.window.activeTextEditor?.document !== doc) return;
+    const reverts = revertsOutsideBody(before, e.contentChanges);
+    if (reverts.length === 0) return;
+    const edit = new vscode.WorkspaceEdit();
+    for (const r of reverts) edit.replace(doc.uri, new vscode.Range(doc.positionAt(r.start), doc.positionAt(r.end)), r.text);
+    this.ownEdit.set(k, doc.version + 1);
+    void vscode.workspace.applyEdit(edit).then((ok) => {
+      if (!ok) this.ownEdit.delete(k);
+    });
+    vscode.window.setStatusBarMessage("$(lock) The preamble and what follows \\end{document} are read-only in live preview. Switch to Source to edit them.", 4000);
   }
 
   private foldOn(doc: vscode.TextDocument): boolean {

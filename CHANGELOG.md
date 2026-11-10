@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Live preview keeps the preamble and anything after \end{document} read-only; switch to Source to edit them.
+
 ## 0.1.2
 
 - Double and triple click work again in live preview: code under a click is shown only once the clicking is over.

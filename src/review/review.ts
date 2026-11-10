@@ -3,6 +3,7 @@ import * as path from "path";
 import { Change, changeAt, computeChanges, kindOf } from "./diff";
 import { ReviewFile, emptyReview, isEmptyReview, parseReview, serializeReview, shiftRange, reanchor, StoredThread } from "./model";
 import { markUp } from "./markup";
+import { applyOwnEdit } from "../own-edits";
 
 const isTex = (doc: vscode.TextDocument) => doc.languageId === "latex" || doc.languageId === "tex";
 
@@ -441,7 +442,7 @@ export class TrackChanges implements vscode.Disposable {
     for (const c of picked) {
       edit.replace(doc.uri, new vscode.Range(doc.positionAt(c.curStart), doc.positionAt(c.curEnd)), c.deleted);
     }
-    await vscode.workspace.applyEdit(edit);
+    await applyOwnEdit(doc.uri, edit);
     this.store.recompute(r, doc);
   }
 
