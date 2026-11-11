@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+
+- PDF view: pictures work on the real pages too: double-click one to edit the drawing in Reactio Draw, click a compound label (\\rcmpd) on it to copy it. The pictures are found on the page by their own size, so this works for \\includegraphics PDFs and Reactio \\input figures.
+
 ## 0.5.1
 
 - Zotero: mciteplus starred keys (\\cite{a,*b}) are looked up without the star; in the visual editor a starred key does not add its own number.

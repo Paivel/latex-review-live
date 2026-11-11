@@ -1198,7 +1198,7 @@ async function showPdf(b64: string) {
   const lib = await loadPdfjs();
   const pdf = await lib.getDocument({ data: bytes, isEvalSupported: false }).promise;
   const width = Math.min(pdfView.clientWidth || 800, 900) - 24;
-  const pages: HTMLCanvasElement[] = [];
+  const pages: HTMLElement[] = [];
   for (let i = 1; i <= pdf.numPages; i++) {
     const pg = await pdf.getPage(i);
     if (gen !== pdfGen) return; // a newer PDF came meanwhile
@@ -1212,7 +1212,11 @@ async function showPdf(b64: string) {
     c.dataset.page = String(i);
     c.dataset.scale = String(css);
     await pg.render({ canvasContext: c.getContext("2d")!, viewport: vp }).promise;
-    pages.push(c);
+    const wrap = el("div", "pdfpagewrap");
+    wrap.style.width = `${width}px`;
+    wrap.appendChild(c);
+    try { await figureSpots(lib, pg, pg.getViewport({ scale: css }), wrap); } catch { /* the page still shows */ }
+    pages.push(wrap);
   }
   if (gen !== pdfGen) return;
   // Swap all pages at once, keeping the scroll position.
@@ -1220,6 +1224,71 @@ async function showPdf(b64: string) {
   pdfView.textContent = "";
   for (const c of pages) pdfView.appendChild(c);
   window.scrollTo(0, y);
+}
+
+/**
+ * Pictures on a real page work as on the drawn one: double-click edits the drawing, a compound label copies it.
+ * An included PDF is a form XObject whose box is the picture's own page, so it is found by its natural size.
+ */
+async function figureSpots(lib: any, pg: any, vp: any, wrap: HTMLElement) {
+  const imgs = (doc?.blocks ?? []).flatMap((b) => b.fig?.images ?? []).filter((im) => im.file && im.heightPt);
+  if (!imgs.length) return;
+  const ops = await pg.getOperatorList();
+  const O = lib.OPS;
+  const mul = (m: number[], n: number[]) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+  let ctm = [1, 0, 0, 1, 0, 0];
+  const stack: number[][] = [];
+  const used = new Set<object>();
+  for (let k = 0; k < ops.fnArray.length; k++) {
+    const fn = ops.fnArray[k];
+    const args = ops.argsArray[k];
+    if (fn === O.save) stack.push(ctm);
+    else if (fn === O.restore) ctm = stack.pop() ?? ctm;
+    else if (fn === O.transform) ctm = mul(ctm, args);
+    else if (fn === O.paintFormXObjectBegin) {
+      stack.push(ctm);
+      const [matrix, bbox] = args as [number[] | null, number[]];
+      if (matrix) ctm = mul(ctm, matrix);
+      if (!bbox) continue;
+      const bw = Math.abs(bbox[2] - bbox[0]);
+      const bh = Math.abs(bbox[3] - bbox[1]);
+      const im = imgs.find((x) => !used.has(x) && Math.abs((x.heightPt ?? 0) - bh) < 1 && (!x.widthPt || Math.abs(x.widthPt - bw) < 1));
+      if (!im) continue;
+      used.add(im);
+      // The box's corners on the page, then in CSS pixels.
+      const pt = (x: number, y: number) => [ctm[0] * x + ctm[2] * y + ctm[4], ctm[1] * x + ctm[3] * y + ctm[5]];
+      const [x0, y0] = pt(bbox[0], bbox[1]);
+      const [x1, y1] = pt(bbox[2], bbox[3]);
+      // Page points to CSS pixels by the viewport's own matrix (pdf.js's helpers moved between versions).
+      const T = vp.transform as number[];
+      const v = (x: number, y: number) => [T[0] * x + T[2] * y + T[4], T[1] * x + T[3] * y + T[5]];
+      const r = [...v(x0, y0), ...v(x1, y1)];
+      const left = Math.min(r[0], r[2]), top = Math.min(r[1], r[3]);
+      const w = Math.abs(r[2] - r[0]), h = Math.abs(r[3] - r[1]);
+      const spot = el("div", "figspot");
+      Object.assign(spot.style, { left: `${left}px`, top: `${top}px`, width: `${w}px`, height: `${h}px` });
+      spot.title = "Double-click to edit the drawing";
+      spot.addEventListener("click", (e) => e.stopPropagation());
+      spot.addEventListener("dblclick", (e) => { e.preventDefault(); e.stopPropagation(); vscode.postMessage({ type: "editFigure", file: im.file, entry: im.entry }); });
+      const scale = w / bw; // CSS px per pt of the picture
+      for (const l of im.labels ?? []) {
+        const refs = [...l.tex.matchAll(/\\(?:r?cmpd|refcmpd|cmpdplain)\*?(?:\[[^\]]*\])*\{[^{}]*\}/g)].map((x) => x[0]);
+        if (!refs.length) continue;
+        // An invisible copy of the label over the printed one, as the click target.
+        const t = el("span", "plabel ref spotlabel");
+        t.style.left = `${l.x * 100}%`;
+        t.style.bottom = `${l.y * 100}%`;
+        t.style.fontSize = `${l.size * scale}px`;
+        renderNodes(t, l.nodes ?? [], 0);
+        t.title = `${refs.join(", ")}: click to copy`;
+        t.addEventListener("mousedown", (e) => e.preventDefault());
+        t.addEventListener("dblclick", (e) => e.stopPropagation());
+        t.addEventListener("click", (e) => { e.stopPropagation(); labelPop(t, refs); });
+        spot.appendChild(t);
+      }
+      wrap.appendChild(spot);
+    } else if (fn === O.paintFormXObjectEnd) ctm = stack.pop() ?? ctm;
+  }
 }
 
 pdfView.addEventListener("click", (e) => {

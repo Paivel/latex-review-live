@@ -144,3 +144,9 @@ canvas.pdfpage { background: #fff; box-shadow: 0 2px 14px #0005; cursor: text; }
 .pdfstatus { color: var(--muted, #888); }
 .pdfstatus.building { color: var(--muted, #888); }
 .pdfstatus.error, .pdfstatus.missing { color: #d9534f; cursor: help; }
+.pdfpagewrap { position: relative; box-shadow: 0 2px 14px #0005; }
+.pdfpagewrap canvas.pdfpage { display: block; box-shadow: none; }
+.figspot { position: absolute; cursor: pointer; border-radius: 2px; }
+.figspot:hover { outline: 1px dashed #2a62c988; }
+.spotlabel, .spotlabel * { color: transparent !important; }
+.spotlabel:hover { background: #2a62c922; }
