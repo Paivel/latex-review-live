@@ -86,7 +86,11 @@ export function computeChanges(base: string, cur: string, timeoutMs = 1500): Cha
   }
   if (open) raw.push(open);
 
-  // Merge changes split by a short run of spaces on the same line.
+  return mergeNear(raw, base, cur);
+}
+
+/** Merge changes split by a short run of spaces on the same line. */
+function mergeNear(raw: Change[], base: string, cur: string): Change[] {
   const merged: Change[] = [];
   for (const c of raw) {
     const last = merged[merged.length - 1];
@@ -103,6 +107,126 @@ export function computeChanges(base: string, cur: string, timeoutMs = 1500): Cha
     merged.push({ ...c });
   }
   return merged;
+}
+
+/**
+ * A run that the baseline and the current text share: base[b, b+len) === cur[c, c+len).
+ * Keeping these across edits is what stops a deletion from jumping: a fresh diff
+ * of the whole text may align a blank line or a repeated word with a different
+ * copy and so show the deleted text somewhere else.
+ */
+export interface Seg {
+  b: number;
+  c: number;
+  len: number;
+}
+
+/** The shared runs between the changes. */
+export function segsOf(base: string, cur: string, changes: Change[]): Seg[] {
+  const out: Seg[] = [];
+  let b = 0;
+  let c = 0;
+  for (const ch of changes) {
+    if (ch.baseStart > b) out.push({ b, c, len: ch.baseStart - b });
+    b = ch.baseEnd;
+    c = ch.curEnd;
+  }
+  if (base.length > b) out.push({ b, c, len: base.length - b });
+  return out;
+}
+
+/** Runs after replacing [start, end) on one side by `newLen` characters: cut where they overlap, shift after. */
+export function editSegs(segs: Seg[], side: "b" | "c", start: number, end: number, newLen: number): Seg[] {
+  const delta = newLen - (end - start);
+  const other = side === "b" ? "c" : "b";
+  const out: Seg[] = [];
+  for (const s of segs) {
+    const a = s[side];
+    const z = a + s.len;
+    if (z <= start) {
+      out.push(s);
+      continue;
+    }
+    if (a >= end) {
+      out.push({ ...s, [side]: a + delta } as Seg);
+      continue;
+    }
+    if (a < start) out.push({ ...s, len: start - a });
+    if (z > end) {
+      const cut = end - a;
+      out.push({ [side]: end + delta, [other]: s[other] + cut, len: z - end } as unknown as Seg);
+    }
+  }
+  return out;
+}
+
+/** The runs still hold for these texts. */
+export function segsValid(base: string, cur: string, segs: Seg[]): boolean {
+  let b = 0;
+  let c = 0;
+  for (const s of segs) {
+    if (s.len <= 0 || s.b < b || s.c < c || s.b + s.len > base.length || s.c + s.len > cur.length) return false;
+    if (base.slice(s.b, s.b + s.len) !== cur.slice(s.c, s.c + s.len)) return false;
+    b = s.b + s.len;
+    c = s.c + s.len;
+  }
+  return true;
+}
+
+/**
+ * Changes when the shared runs are known: only the text between runs is diffed.
+ * A run cut inside a word gives that word back to the gap, so changes stay whole words.
+ */
+export function changesBetween(base: string, cur: string, segs: Seg[], timeoutMs = 1500): Change[] {
+  // Join touching runs.
+  let runs: Seg[] = [];
+  for (const s of segs) {
+    const last = runs[runs.length - 1];
+    if (last && last.b + last.len === s.b && last.c + last.len === s.c) last.len += s.len;
+    else if (s.len > 0) runs.push({ ...s });
+  }
+  const word = (t: string, i: number) => i >= 0 && i < t.length && !isSpace(t[i]);
+  for (let changed = true; changed; ) {
+    changed = false;
+    const next: Seg[] = [];
+    for (let k = 0; k < runs.length; k++) {
+      const s = { ...runs[k] };
+      const prev = next[next.length - 1];
+      const pb = prev ? prev.b + prev.len : 0;
+      const pc = prev ? prev.c + prev.len : 0;
+      // A gap before this run that ends in a word, while the run starts mid-word.
+      if ((s.b > pb && word(base, s.b - 1)) || (s.c > pc && word(cur, s.c - 1))) {
+        while (s.len > 0 && word(cur, s.c)) { s.b++; s.c++; s.len--; changed = true; }
+      }
+      const nb = k + 1 < runs.length ? runs[k + 1].b : base.length;
+      const nc = k + 1 < runs.length ? runs[k + 1].c : cur.length;
+      const eb = s.b + s.len;
+      const ec = s.c + s.len;
+      if ((nb > eb && word(base, eb)) || (nc > ec && word(cur, ec))) {
+        while (s.len > 0 && word(cur, s.c + s.len - 1)) { s.len--; changed = true; }
+      }
+      if (s.len > 0) next.push(s);
+      else changed = true;
+    }
+    runs = next;
+  }
+  const raw: Change[] = [];
+  let b = 0;
+  let c = 0;
+  const gap = (be: number, ce: number) => {
+    if (be > b || ce > c) {
+      for (const ch of computeChanges(base.slice(b, be), cur.slice(c, ce), timeoutMs)) {
+        raw.push({ ...ch, baseStart: ch.baseStart + b, baseEnd: ch.baseEnd + b, curStart: ch.curStart + c, curEnd: ch.curEnd + c });
+      }
+    }
+  };
+  for (const s of runs) {
+    gap(s.b, s.c);
+    b = s.b + s.len;
+    c = s.c + s.len;
+  }
+  gap(base.length, cur.length);
+  return mergeNear(raw, base, cur);
 }
 
 /** The baseline after accepting one change: it now reads like the current text there. */

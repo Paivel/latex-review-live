@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Track changes: a deleted piece stays where it was. Changes are now updated from each edit instead of re-diffing the whole file, which could show the deletion next to an earlier blank line or repeated word.
+
 ## 0.4.0
 
 - Visual editor: lists (itemize, enumerate, description) are drawn as lists, nested too; each item is edited in place, and Enter at an item starts a new \item.

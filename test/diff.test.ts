@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acceptInBase, changeAt, computeChanges, kindOf, rejectInCurrent } from "../src/review/diff";
+import { acceptInBase, changeAt, changesBetween, computeChanges, editSegs, kindOf, rejectInCurrent, segsOf, segsValid } from "../src/review/diff";
 
 describe("computeChanges", () => {
   it("finds an inserted word", () => {
@@ -65,5 +65,44 @@ describe("computeChanges", () => {
     expect(cs).toHaveLength(1);
     expect(cs[0].deleted).toBe("reaction");
     expect(cs[0].inserted).toBe("reactions");
+  });
+});
+
+describe("changesBetween (incremental)", () => {
+  const base = "Intro\n\nsas\n\nsaasasas\n";
+  const cur1 = "Intro\nalpha\nbeta\ngamma\n\nmm nnn\n\ndfdfdf\n\n\n\nsas\n\nsaasasas\n";
+  const at = cur1.indexOf("sas\n\nsaa");
+  const cur2 = cur1.slice(0, at) + cur1.slice(at + 3);
+
+  it("keeps a deletion where the text was, next to earlier insertions", () => {
+    const segs = editSegs(segsOf(base, cur1, computeChanges(base, cur1)), "c", at, at + 3, 0);
+    expect(segsValid(base, cur2, segs)).toBe(true);
+    const cs = changesBetween(base, cur2, segs);
+    const del = cs.find((c) => c.deleted.includes("sas"))!;
+    expect(del.curStart).toBeGreaterThan(cur2.indexOf("dfdfdf"));
+    expect(rejectInCurrent(cur2, cs)).toBe(base);
+  });
+
+  it("gives back whole words when an edit lands mid-word", () => {
+    const b = "The quick fox.";
+    const c = "The quixck fox.";
+    const segs = editSegs(segsOf(b, b, []), "c", 7, 7, 1);
+    const cs = changesBetween(b, c, segs);
+    expect(cs.map((x) => [x.deleted, x.inserted])).toEqual([["quick", "quixck"]]);
+  });
+
+  it("an insertion between words stays a pure insertion", () => {
+    const b = "foo bar";
+    const c = "foo new bar";
+    const cs = changesBetween(b, c, editSegs(segsOf(b, b, []), "c", 4, 4, 4));
+    expect(cs.map((x) => [x.deleted, x.inserted])).toEqual([["", "new "]]);
+  });
+
+  it("undoing a deletion leaves no change", () => {
+    const b = "one two three";
+    const c = "one three";
+    let segs = segsOf(b, c, computeChanges(b, c));
+    segs = editSegs(segs, "c", 4, 4, 4);
+    expect(changesBetween(b, b, segs)).toEqual([]);
   });
 });

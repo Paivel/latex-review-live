@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
-import { Change, changeAt, computeChanges, kindOf } from "./diff";
+import { Change, changeAt, changesBetween, computeChanges, editSegs, kindOf, Seg, segsOf, segsValid } from "./diff";
 import { ReviewFile, emptyReview, isEmptyReview, parseReview, serializeReview, shiftRange, reanchor, StoredThread } from "./model";
 import { markUp } from "./markup";
 import { applyOwnEdit } from "../own-edits";
@@ -16,6 +16,8 @@ export function reviewUri(doc: vscode.Uri): vscode.Uri {
 
 export class DocReview {
   changes: Change[] = [];
+  /** Text shared by baseline and document as of the last diff, moved along with each edit. */
+  segs: Seg[] | undefined;
   /** Sidecar differs from disk; written when the document is next saved (or now, if it is not dirty). */
   pending = false;
   constructor(public readonly uri: vscode.Uri, public data: ReviewFile) {}
@@ -112,6 +114,7 @@ export class ReviewStore implements vscode.Disposable {
       }
     }
     if (moved) r.pending = true;
+    if (r.segs) for (const c of edits) r.segs = editSegs(r.segs, "c", c.rangeOffset, c.rangeOffset + c.rangeLength, c.text.length);
     if (r.tracking) this.schedule(r, e.document);
     else if (moved) this.fire(r);
   }
@@ -131,7 +134,17 @@ export class ReviewStore implements vscode.Disposable {
   /** Recompute changes now (commands call this so they never act on stale ranges). */
   recompute(r: DocReview, doc: vscode.TextDocument) {
     clearTimeout(this.timers.get(r.uri.toString()));
-    r.changes = r.data.baseline === undefined ? [] : computeChanges(r.data.baseline, doc.getText());
+    const base = r.data.baseline;
+    if (base === undefined) {
+      r.changes = [];
+      r.segs = undefined;
+    } else {
+      // Diff only what changed since the last time, so a deleted piece keeps its place;
+      // a fresh whole-text diff is the fallback when the runs no longer fit (reload, outside rewrite).
+      const cur = doc.getText();
+      r.changes = r.segs && segsValid(base, cur, r.segs) ? changesBetween(base, cur, r.segs) : computeChanges(base, cur);
+      r.segs = segsOf(base, cur, r.changes);
+    }
     this.fire(r);
   }
 
@@ -346,6 +359,7 @@ export class TrackChanges implements vscode.Disposable {
     const r = await this.store.get(ed.document);
     if (r.tracking) return;
     r.data.baseline = ed.document.getText();
+    r.segs = undefined;
     r.data.trackingSince = new Date().toISOString();
     this.store.recompute(r, ed.document);
     await this.store.persist(r, ed.document);
@@ -436,7 +450,10 @@ export class TrackChanges implements vscode.Disposable {
 
   private async applyAccept(doc: vscode.TextDocument, r: DocReview, picked: Change[]) {
     let base = r.data.baseline!;
-    for (const c of [...picked].sort((a, b) => b.baseStart - a.baseStart)) base = base.slice(0, c.baseStart) + c.inserted + base.slice(c.baseEnd);
+    for (const c of [...picked].sort((a, b) => b.baseStart - a.baseStart)) {
+      base = base.slice(0, c.baseStart) + c.inserted + base.slice(c.baseEnd);
+      if (r.segs) r.segs = editSegs(r.segs, "b", c.baseStart, c.baseEnd, c.inserted.length);
+    }
     r.data.baseline = base;
     this.store.recompute(r, doc);
     await this.store.persist(r, doc);
