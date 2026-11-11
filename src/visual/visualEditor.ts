@@ -11,6 +11,7 @@ import { parseBbl } from "./bbl";
 import { pdfSize, reactioLabels } from "./figureFiles";
 import { execFile } from "child_process";
 import * as crypto from "crypto";
+import { LivePdf } from "./livePdf";
 
 type FromPage =
   | { type: "ready" }
@@ -23,7 +24,9 @@ type FromPage =
   | { type: "source" }
   | { type: "openInput"; file: string }
   | { type: "undo"; redo: boolean }
-  | { type: "editFigure"; file: string; entry?: string };
+  | { type: "editFigure"; file: string; entry?: string }
+  | { type: "pdfMode"; on: boolean }
+  | { type: "pdfClick"; page: number; x: number; y: number };
 
 /**
  * The visual editor: the document drawn like the PDF, in a tab beside the
@@ -44,7 +47,16 @@ export class VisualEditor implements vscode.Disposable {
       vscode.commands.registerCommand("latexReview.visualUndo", (redo?: boolean) => {
         for (const p of this.panels.values()) if (p.panel.active) void p.panel.webview.postMessage({ type: "undo", redo: !!redo });
       }),
-      vscode.workspace.onDidChangeTextDocument((e) => this.panels.get(e.document.uri.toString())?.schedule(60)),
+      // Cmd+V in the page: VS Code's own paste into a webview often reaches nothing, so the text comes from the clipboard API.
+      vscode.commands.registerCommand("latexReview.visualPaste", async () => {
+        const text = await vscode.env.clipboard.readText();
+        for (const p of this.panels.values()) if (p.panel.active) void p.panel.webview.postMessage({ type: "paste", text });
+      }),
+      vscode.workspace.onDidChangeTextDocument((e) => {
+        const p = this.panels.get(e.document.uri.toString());
+        p?.schedule(60);
+        p?.edited();
+      }),
       vscode.workspace.onDidSaveTextDocument((d) => this.panels.get(d.uri.toString())?.schedule(300)),
       store.onDidChange((r) => this.panels.get(r.uri.toString())?.schedule(30)),
       vscode.window.onDidChangeTextEditorSelection((e) => {
@@ -54,7 +66,8 @@ export class VisualEditor implements vscode.Disposable {
     );
     // Pictures change when Reactio Draw saves a drawing or LaTeX writes the .aux.
     const w = vscode.workspace.createFileSystemWatcher("**/*.{pdf,png,jpg,jpeg,svg,aux}");
-    const all = () => this.panels.forEach((p) => p.schedule(400, true));
+    // The PDF view's own builds (.latex-review/live) are not pictures of the document.
+    const all = (u: vscode.Uri) => { if (!/[\\/]\.latex-review[\\/]/.test(u.fsPath)) this.panels.forEach((p) => p.schedule(400, true)); };
     this.disposables.push(w, w.onDidChange(all), w.onDidCreate(all));
   }
 
@@ -102,8 +115,35 @@ class Panel {
     this.panel.webview.onDidReceiveMessage((m: FromPage) =>
       this.receive(m).catch((e) => void vscode.window.showErrorMessage(`Visual editor: ${(e as Error)?.message ?? e}`)),
     );
-    this.panel.onDidDispose(() => { clearTimeout(this.timer); onClose(); });
+    this.panel.onDidDispose(() => { clearTimeout(this.timer); this.live?.dispose(); onClose(); });
     void store.get(opened).then(() => this.schedule(0));
+  }
+
+  /** The PDF view: real pages from latexmk, while it is shown. */
+  private live: LivePdf | undefined;
+
+  edited() {
+    this.live?.schedule();
+  }
+
+  private setPdfMode(on: boolean) {
+    if (!on) { this.live?.dispose(); this.live = undefined; return; }
+    if (!vscode.workspace.isTrusted) {
+      void this.panel.webview.postMessage({ type: "pdfStatus", state: "error", text: "The PDF view runs LaTeX, so it needs a trusted workspace." });
+      return;
+    }
+    if (this.live) return;
+    const live = new LivePdf(
+      this.opened.uri.fsPath,
+      () => this.doc.getText(),
+      (pdf) => void this.panel.webview.postMessage({ type: "pdf", data: pdf.toString("base64") }),
+      (s) => void this.panel.webview.postMessage({ type: "pdfStatus", ...s }),
+    );
+    this.live = live;
+    // Show the last build at once, then build the current text.
+    const have = live.current();
+    if (have) void this.panel.webview.postMessage({ type: "pdf", data: have.toString("base64") });
+    live.schedule(0);
   }
 
   schedule(delay: number, refresh = false) {
@@ -300,6 +340,21 @@ class Panel {
         this.panel.reveal(this.panel.viewColumn, false);
         this.schedule(0, true);
         return;
+      }
+      case "pdfMode":
+        return this.setPdfMode(m.on);
+      case "pdfClick": {
+        const at = await this.live?.where(m.page, m.x, m.y);
+        if (!at) return void this.panel.webview.postMessage({ type: "pdfTarget", offset: null });
+        if (path.normalize(at.file) !== path.normalize(this.opened.uri.fsPath)) {
+          // Text from an \input file: edit it there.
+          const d = await vscode.workspace.openTextDocument(vscode.Uri.file(at.file));
+          const p = new vscode.Position(Math.max(0, at.line - 1), 0);
+          await vscode.window.showTextDocument(d, { viewColumn: vscode.ViewColumn.One, selection: new vscode.Range(p, p) });
+          return;
+        }
+        const line = Math.min(Math.max(0, at.line - 1), doc.lineCount - 1);
+        return void this.panel.webview.postMessage({ type: "pdfTarget", offset: doc.offsetAt(new vscode.Position(line, 0)) });
       }
       case "source": {
         const ed = await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.One, preserveFocus: false });

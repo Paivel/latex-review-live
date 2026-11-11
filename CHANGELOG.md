@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0
+
+- Visual editor: a PDF view (PDF button in the bar). The real pages come from latexmk, rebuilt a moment after each edit from the editor's text (unsaved changes included) into .latex-review/live, with TeX run in the document's folder so pictures and .bib files resolve as usual. Click a paragraph, heading, list or equation: SyncTeX finds its line and that block opens over the page for editing; Done or Esc closes it and the next build shows the result. Text from an \\input file opens in the text editor. Works with TeX Live and MiKTeX on macOS, Windows and Linux; needs a trusted workspace. A "% !TEX program = xelatex" or "lualatex" line picks the engine.
+- Visual editor: Cmd+V / Ctrl+V pastes through VS Code's clipboard, so pasted commands such as \\rcmpd{3} always arrive, also after focus went to another pane.
+
 ## 0.4.3
 
 - Visual editor, achemso: authors carry their footnote marks (* for an e-mail, ‡ ¶ § for affiliations, ‖ ⊥ for other notes) assigned the way the class does; affiliations are listed with their marks; phone and fax are shown; title and authors are sans-serif.

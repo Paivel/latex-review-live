@@ -2,7 +2,7 @@
 import { escapeText } from "../inline";
 import type { MNode, VBlock, VDoc, VList, VText } from "../model";
 
-declare const acquireVsCodeApi: () => { postMessage(m: unknown): void };
+declare const acquireVsCodeApi: () => { postMessage(m: unknown): void; getState(): any; setState(s: unknown): void };
 declare const katex: { render(tex: string, el: HTMLElement, opts: object): void; renderToString(tex: string, opts: object): string };
 declare global { interface Window { PDFJS_URL: string; PDFJS_WORKER: string } }
 
@@ -479,6 +479,11 @@ function render(d: VDoc, refresh: boolean) {
   bar.appendChild(el("span", "name", d.name));
   const n = d.changes.length;
   if (d.tracking || n) bar.appendChild(el("span", "count", n ? `${n} change${n === 1 ? "" : "s"}` : "Tracking changes"));
+  bar.appendChild(pdfStatusEl);
+  const mode = el("button", pdfMode ? "on" : "", pdfMode ? "Visual" : "PDF");
+  mode.title = pdfMode ? "Back to the drawn page" : "Show the real PDF (latexmk); click a paragraph to edit it";
+  mode.onclick = () => setPdfMode(!pdfMode);
+  bar.appendChild(mode);
   const src = el("button", "", "Source");
   src.onclick = () => vscode.postMessage({ type: "source" });
   bar.appendChild(src);
@@ -528,6 +533,7 @@ function render(d: VDoc, refresh: boolean) {
     if (again) restoreCaret(again, caret);
   }
   void prevDoc;
+  placeOverlay();
 }
 
 /** Shift a reused block's offsets to the new ones. Regions keep their offset to the block start. */
@@ -868,9 +874,34 @@ page.addEventListener("paste", (ev) => {
   const r = (ev.target as HTMLElement).closest<HTMLElement>(".region");
   if (!r) return;
   ev.preventDefault();
-  const text = ev.clipboardData?.getData("text/plain") ?? "";
-  document.execCommand("insertText", false, r.dataset.region === "code" ? text : text.replace(/\r?\n\s*\n/g, MARK).replace(/\r?\n/g, " "));
+  pasteText(ev.clipboardData?.getData("text/plain") ?? "");
 });
+
+/** Plain text in at the caret: into a field as is, into a region with paragraph breaks kept and other line breaks as spaces. */
+function pasteText(text: string) {
+  if (!text) return;
+  const a = document.activeElement as HTMLElement | null;
+  if (a && (a.tagName === "TEXTAREA" || a.tagName === "INPUT")) {
+    const t = a as HTMLTextAreaElement;
+    t.setRangeText(text, t.selectionStart ?? t.value.length, t.selectionEnd ?? t.value.length, "end");
+    t.dispatchEvent(new Event("input", { bubbles: true }));
+    return;
+  }
+  const sel = getSelection();
+  let r = (sel?.anchorNode instanceof HTMLElement ? sel.anchorNode : sel?.anchorNode?.parentElement)?.closest<HTMLElement>(".region") ?? null;
+  if (!r && lastSpot) {
+    // Focus went to VS Code and back: put the caret where it was, in the block as drawn now.
+    const box = [...page.querySelectorAll<HTMLElement>(":scope > .block")].find((x) => Number(x.dataset.start) === lastSpot!.start);
+    if (box) {
+      restoreCaret(box, lastSpot.caret);
+      const s2 = getSelection();
+      r = (s2?.anchorNode instanceof HTMLElement ? s2.anchorNode : s2?.anchorNode?.parentElement)?.closest<HTMLElement>(".region") ?? null;
+    }
+  }
+  if (!r) return;
+  if (document.activeElement !== r) r.focus();
+  document.execCommand("insertText", false, r.dataset.region === "code" ? text : text.replace(/\r?\n\s*\n/g, MARK).replace(/\r?\n/g, " "));
+}
 
 page.addEventListener("focusout", (ev) => {
   const r = (ev.target as HTMLElement).closest?.<HTMLElement>(".region");
@@ -991,7 +1022,12 @@ document.addEventListener("selectionchange", () => {
   const r = sel.getRangeAt(0);
   const host = (r.startContainer.nodeType === 1 ? (r.startContainer as HTMLElement) : r.startContainer.parentElement)?.closest<HTMLElement>(".region");
   if (host && host.dataset.region !== "code" && !host.dataset.field) lastCaret = r.cloneRange();
+  // By position too, for when the block has been redrawn since.
+  const box = host?.closest<HTMLElement>(".block");
+  const c = host && box ? saveCaret() : null;
+  if (box && c) lastSpot = { start: Number(box.dataset.start), caret: c };
 });
+let lastSpot: { start: number; caret: { region: number; offset: number } } | null = null;
 
 function copyText(v: string) {
   void navigator.clipboard?.writeText(v).catch(() => {
@@ -1106,7 +1142,17 @@ window.addEventListener("message", (e) => {
     page.querySelectorAll<HTMLTextAreaElement>("textarea.eqsrc").forEach((t) => flushMath(t));
     vscode.postMessage({ type: "undo", redo: !!m.redo });
   }
+  if (m.type === "paste") pasteText(m.text as string);
+  if (m.type === "pdf") void showPdf(m.data as string);
+  if (m.type === "pdfStatus") {
+    pdfStatusEl.textContent = m.state === "building" ? "Building…" : m.state === "ok" ? "" : m.state === "error" ? "LaTeX error" : "No latexmk";
+    pdfStatusEl.title = m.text ?? "";
+    pdfStatusEl.className = `pdfstatus ${m.state}`;
+    if (m.state !== "building" && m.state !== "ok" && pdfMode && !pdfView.querySelector("canvas")) pdfView.textContent = m.text;
+  }
+  if (m.type === "pdfTarget") openOverlay(m.offset as number | null);
   if (m.type === "cursor") {
+    if (pdfMode) return;
     if (document.hasFocus() && page.contains(document.activeElement)) return;
     for (const box of page.querySelectorAll<HTMLElement>(":scope > .block")) {
       if (m.offset >= Number(box.dataset.start) && m.offset <= Number(box.dataset.end) + 1) {
@@ -1121,4 +1167,122 @@ window.addEventListener("message", (e) => {
 });
 window.addEventListener("error", (e) => vscode.postMessage({ type: "log", text: `error: ${e.message} @${e.lineno}` }));
 window.addEventListener("unhandledrejection", (e) => vscode.postMessage({ type: "log", text: `rejection: ${(e.reason as Error)?.message ?? e.reason}` }));
+// ---------------------------------------------------------------- PDF view
+// The real pages from latexmk. A click asks SyncTeX for the source line, and that block of the drawn
+// page opens over the PDF for editing; the next build replaces it with the real page.
+const pdfView = el("div", "pdfview");
+pdfView.hidden = true;
+document.body.appendChild(pdfView);
+const pdfStatusEl = el("span", "pdfstatus");
+let pdfMode = false;
+let overlayAt: number | null = null;
+let overlayTop = 0;
+let lastClickY = 0;
+
+function setPdfMode(on: boolean) {
+  pdfMode = on;
+  try { vscode.setState({ ...(vscode.getState() ?? {}), pdfMode: on }); } catch { /* no state */ }
+  closeOverlay();
+  document.body.classList.toggle("pdfmode", on);
+  pdfView.hidden = !on;
+  if (on && !pdfView.querySelector("canvas")) pdfView.textContent = "Building the PDF…";
+  if (!on) pdfStatusEl.textContent = "";
+  vscode.postMessage({ type: "pdfMode", on });
+  if (doc) render(doc, false);
+}
+
+let pdfGen = 0;
+async function showPdf(b64: string) {
+  const gen = ++pdfGen;
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const lib = await loadPdfjs();
+  const pdf = await lib.getDocument({ data: bytes, isEvalSupported: false }).promise;
+  const width = Math.min(pdfView.clientWidth || 800, 900) - 24;
+  const pages: HTMLCanvasElement[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const pg = await pdf.getPage(i);
+    if (gen !== pdfGen) return; // a newer PDF came meanwhile
+    const base = pg.getViewport({ scale: 1 });
+    const css = width / base.width;
+    const vp = pg.getViewport({ scale: css * (window.devicePixelRatio || 1) });
+    const c = el("canvas", "pdfpage");
+    c.width = Math.floor(vp.width);
+    c.height = Math.floor(vp.height);
+    c.style.width = `${width}px`;
+    c.dataset.page = String(i);
+    c.dataset.scale = String(css);
+    await pg.render({ canvasContext: c.getContext("2d")!, viewport: vp }).promise;
+    pages.push(c);
+  }
+  if (gen !== pdfGen) return;
+  // Swap all pages at once, keeping the scroll position.
+  const y = window.scrollY;
+  pdfView.textContent = "";
+  for (const c of pages) pdfView.appendChild(c);
+  window.scrollTo(0, y);
+}
+
+pdfView.addEventListener("click", (e) => {
+  const c = (e.target as HTMLElement).closest<HTMLCanvasElement>("canvas.pdfpage");
+  if (!c) return;
+  const r = c.getBoundingClientRect();
+  const scale = Number(c.dataset.scale);
+  lastClickY = e.clientY - (pdfView.getBoundingClientRect().top) ;
+  vscode.postMessage({ type: "pdfClick", page: Number(c.dataset.page), x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale });
+});
+
+function openOverlay(offset: number | null) {
+  if (offset === null || !doc) return;
+  // The block holding the line; comments, \begin lines and the preamble stand for the next text block.
+  const blocks = doc.blocks;
+  let i = blocks.findIndex((b) => offset >= b.start && offset <= b.end);
+  if (i < 0) i = blocks.findIndex((b) => b.start >= offset);
+  if (i < 0) return;
+  if (blocks[i].kind === "preamble") { const t = blocks.findIndex((b) => b.virtual || b.titleBlock); i = t >= 0 ? t : i + 1; }
+  while (i < blocks.length && (blocks[i].wrap || blocks[i].commentOnly)) i++;
+  if (!blocks[i]) return;
+  overlayAt = blocks[i].start;
+  overlayTop = lastClickY;
+  placeOverlay();
+  const box = page.querySelector<HTMLElement>(".block.editing");
+  box?.querySelector<HTMLElement>(".region, textarea, .eq")?.focus();
+}
+
+function placeOverlay() {
+  page.querySelectorAll(".block.editing").forEach((b) => b.classList.remove("editing"));
+  const on = pdfMode && overlayAt !== null;
+  page.classList.toggle("floating", on);
+  if (!on) { doneBtn.hidden = true; return; }
+  const box = [...page.querySelectorAll<HTMLElement>(":scope > .block")].find((b) => Number(b.dataset.start) === overlayAt);
+  if (!box) { closeOverlay(); return; }
+  box.classList.add("editing");
+  const top = pdfView.offsetTop + Math.max(0, overlayTop - 40);
+  page.style.top = `${top}px`;
+  doneBtn.hidden = false;
+  doneBtn.style.top = `${top - 30}px`;
+}
+
+function closeOverlay() {
+  if (overlayAt === null) return;
+  // Send what was typed, then hide it: the next build shows it on the real page.
+  for (const r of page.querySelectorAll<HTMLElement>(".block.editing .region")) if (!r.dataset.field && regionText(r) !== (r.dataset.src ?? "")) flush(r);
+  overlayAt = null;
+  page.classList.remove("floating");
+  page.style.top = "";
+  doneBtn.hidden = true;
+  page.querySelectorAll(".block.editing").forEach((b) => b.classList.remove("editing"));
+}
+
+const doneBtn = el("button", "overlaydone", "Done");
+doneBtn.title = "Close (Esc)";
+doneBtn.addEventListener("mousedown", (e) => { e.preventDefault(); closeOverlay(); });
+doneBtn.hidden = true;
+document.body.appendChild(doneBtn);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && overlayAt !== null) closeOverlay(); });
+document.addEventListener("mousedown", (e) => {
+  if (overlayAt !== null && !page.contains(e.target as Node) && pdfView.contains(e.target as Node)) closeOverlay();
+});
+
+try { if (vscode.getState()?.pdfMode) setTimeout(() => setPdfMode(true), 0); } catch { /* no state */ }
+
 vscode.postMessage({ type: "ready" });
