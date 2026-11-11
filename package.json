@@ -2,7 +2,7 @@
   "name": "latex-review-live",
   "displayName": "LaTeX Review and Visual Editor",
   "description": "Track changes with accept/reject, review comments, and a visual editor that shows the document like the PDF and lets you edit it there.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
@@ -31,7 +31,12 @@
   ],
   "capabilities": {
     "untrustedWorkspaces": {
-      "supported": true
+      "supported": "limited",
+      "description": "In a folder you do not trust, citations are not fetched from Zotero by themselves, and PDF figures are drawn in the page instead of by Quick Look or pdftoppm.",
+      "restrictedConfigurations": [
+        "latexReview.zotero.server",
+        "latexReview.zotero.autoBibliography"
+      ]
     }
   },
   "contributes": {
@@ -448,7 +453,8 @@
         "latexReview.zotero.server": {
           "type": "string",
           "default": "http://127.0.0.1:23119",
-          "description": "Address of Zotero's local server."
+          "description": "Address of Zotero's local server.",
+          "scope": "machine"
         },
         "latexReview.visual.followCursor": {
           "type": "boolean",

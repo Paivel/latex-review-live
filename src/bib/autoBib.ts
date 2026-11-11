@@ -44,7 +44,8 @@ export class AutoBib implements vscode.Disposable {
   }
 
   private enabled(d: vscode.TextDocument) {
-    return d.languageId === "latex" && d.uri.scheme === "file" && vscode.workspace.getConfiguration("latexReview.zotero", d.uri).get("autoBibliography", true);
+    // In a folder VS Code does not trust, nothing is fetched or written by itself (the command still works).
+    return vscode.workspace.isTrusted && d.languageId === "latex" && d.uri.scheme === "file" && vscode.workspace.getConfiguration("latexReview.zotero", d.uri).get("autoBibliography", true);
   }
 
   private schedule(d: vscode.TextDocument, delay: number) {

@@ -152,7 +152,8 @@ class Panel {
             const size = /\.pdf$/i.test(p) ? pdfSize(p) : undefined;
             const labels = entry ? reactioLabels(entry) : undefined;
             const extra = { file: p, entry, widthPt: size?.w, heightPt: size?.h, labels };
-            if (/\.pdf$/i.test(p)) {
+            // Quick Look and pdftoppm read the PDF; in a folder VS Code does not trust, pdf.js in the page draws it instead.
+            if (/\.pdf$/i.test(p) && vscode.workspace.isTrusted) {
               const png = pictureOf(p, path.join(this.storage.fsPath, "pictures"), () => this.schedule(0));
               // The PNG goes to the page as data (once per version): the page cannot always load files from the extension's storage.
               if (png === "pending") return { name: g.path, uri: null, pdf: false, pending: true, ...extra };
@@ -261,6 +262,9 @@ class Panel {
       }
       case "editFigure": {
         // Reactio Draw opens the drawing a figure was made from; otherwise open the picture itself.
+        // Only a picture or drawing of a figure in this document, never any path the page names.
+        const known = this.build().blocks.flatMap((b) => b.fig?.images ?? []);
+        if (!known.some((im) => im.file === m.file && (m.entry === undefined || im.entry === m.entry))) return;
         const target = vscode.Uri.file(m.entry ?? m.file);
         const cmds = await vscode.commands.getCommands(true);
         if (cmds.includes("reactioLatex.editFigureSource")) return vscode.commands.executeCommand("reactioLatex.editFigureSource", target);
@@ -278,8 +282,12 @@ class Panel {
     const dist = (p: string) => w.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, "dist", p)).toString();
     const nonce = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
     const csp = w.cspSource;
+    // Scripts: ours by nonce, and pdf.js's module from its own folder only (not the workspace the page may show pictures from).
+    // A CSP host cannot hold the "+" of file+.vscode-resource.vscode-cdn.net, so it is matched by the wildcard with the path.
+    const pdfjsUrl = new URL(dist("pdfjs/"));
+    const pdfjsSource = /\.vscode-cdn\.net$/.test(pdfjsUrl.hostname) ? `https://*.vscode-cdn.net${pdfjsUrl.pathname}` : csp;
     return `<!doctype html><html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${csp} data: blob:; font-src ${csp} data:; style-src ${csp} 'unsafe-inline'; script-src 'nonce-${nonce}' ${csp}; worker-src ${csp} blob:; connect-src ${csp};">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${csp} data: blob:; font-src ${csp} data:; style-src ${csp} 'unsafe-inline'; script-src 'nonce-${nonce}' ${pdfjsSource}; worker-src blob:; connect-src ${csp};">
 <link rel="stylesheet" href="${dist("katex/katex.min.css")}">
 <link rel="stylesheet" href="${dist("visual.css")}">
 </head><body>

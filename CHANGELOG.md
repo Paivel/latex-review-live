@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Security: in a folder VS Code does not trust (Restricted Mode), citations are not fetched from Zotero by themselves and PDF figures are not handed to Quick Look or pdftoppm; the page draws them with pdf.js.
+- Security: the Zotero server address can only be set in your own settings, not by a project's .vscode/settings.json.
+- Security: the visual editor page runs only its own scripts (not scripts from the workspace folders it shows pictures from), and double-clicking a figure opens only that figure's files.
+
 ## 0.3.0
 
 - Live preview (the mode that hid LaTeX code in the editor) is removed: the visual editor replaces it. Its settings, colours, the eye button and Cmd+Alt+P are gone.
