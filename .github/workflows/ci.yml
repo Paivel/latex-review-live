@@ -1,0 +1,43 @@
+# Every push and pull request: type-check, run the tests and build the .vsix.
+# On main, when package.json has a version with no GitHub release yet, the .vsix is released as
+# v<version> (the release makes the tag). If the repository secret VSCE_PAT (an Azure DevOps token
+# with Marketplace > Manage) exists, it is also published to the Marketplace; otherwise upload the
+# release's .vsix by hand at https://marketplace.visualstudio.com/manage.
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: "*.vsix"
+      - name: New version?
+        id: ver
+        if: github.event_name == 'push'
+        run: |
+          v="v$(node -p "require('./package.json').version")"
+          echo "tag=$v" >> "$GITHUB_OUTPUT"
+          if gh release view "$v" >/dev/null 2>&1; then echo "new=false" >> "$GITHUB_OUTPUT"; else echo "new=true" >> "$GITHUB_OUTPUT"; fi
+      - name: GitHub release with the .vsix
+        if: steps.ver.outputs.new == 'true'
+        run: gh release create "${{ steps.ver.outputs.tag }}" *.vsix --target "$GITHUB_SHA" --title "${{ steps.ver.outputs.tag }}" --notes "See CHANGELOG.md."
+      - name: Publish to the Marketplace
+        if: steps.ver.outputs.new == 'true' && env.VSCE_PAT != ''
+        run: npx vsce publish --no-dependencies --packagePath *.vsix
