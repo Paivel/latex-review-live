@@ -134,6 +134,9 @@ function renderBlock(b: VBlock): HTMLElement {
         if (im.pending) { pics.appendChild(el("div", "missing", `Drawing ${im.name}…`)); continue; }
         if (!im.uri) { pics.appendChild(el("div", "missing", `No picture found for ${im.name}`)); continue; }
         const pic = el("div", "pic");
+        // As LaTeX sets it: natural size (1:1), never wider than the line.
+        const em = (pt: number) => `${pt / (doc?.fontPt ?? 10)}em`;
+        if (im.widthPt) pic.style.width = em(im.widthPt);
         pic.title = "Double-click to edit the drawing";
         pic.addEventListener("dblclick", (e) => { e.preventDefault(); vscode.postMessage({ type: "editFigure", file: im.file, entry: im.entry }); });
         pics.appendChild(pic);
@@ -146,6 +149,15 @@ function renderBlock(b: VBlock): HTMLElement {
           img.src = im.uri.startsWith("png:") ? pictureData.get(im.uri.slice(4)) ?? "" : im.uri;
           img.alt = im.name;
           pic.appendChild(img);
+          for (const l of im.labels ?? []) {
+            const t = el("span", "plabel");
+            t.style.left = `${l.x * 100}%`;
+            t.style.bottom = `${l.y * 100}%`;
+            t.style.fontSize = em(l.size);
+            renderNodes(t, l.nodes ?? [], 0);
+            t.querySelectorAll(".atom").forEach((a) => { (a as HTMLElement).style.pointerEvents = "none"; });
+            pic.appendChild(t);
+          }
         }
       }
       box.appendChild(pics);
@@ -259,7 +271,7 @@ async function drawPdf(uri: string, holder: HTMLElement) {
     const c = el("canvas");
     c.width = src.width;
     c.height = src.height;
-    c.style.width = `${src.width / 3}px`;
+    c.style.width = holder.parentElement?.style.width ? "100%" : `${src.width / 3}px`;
     c.getContext("2d")!.drawImage(src, 0, 0);
     holder.textContent = "";
     holder.appendChild(c);

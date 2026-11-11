@@ -55,10 +55,12 @@ export function cleanBibTex(raw: string): string {
 }
 
 export function parseBbl(bbl: string, cites?: Map<string, string>): BibEntry[] {
-  const begin = bbl.indexOf("\\begin{thebibliography}");
-  const end = bbl.lastIndexOf("\\end{thebibliography}");
-  if (begin < 0) return [];
-  const body = bbl.slice(begin, end < 0 ? bbl.length : end);
+  // achemso writes mcitethebibliography.
+  const b = /\\begin\{(?:mcite)?thebibliography\}/.exec(bbl);
+  if (!b) return [];
+  const begin = b.index;
+  const end = Math.max(bbl.lastIndexOf("\\end{thebibliography}"), bbl.lastIndexOf("\\end{mcitethebibliography}"));
+  const body = bbl.slice(begin, end < begin ? bbl.length : end);
   const items: BibEntry[] = [];
   const re = /\\bibitem\s*(\[(?:[^\]{}]|\{[^}]*\})*\])?\s*\{([^}]*)\}/g;
   const ms = [...body.matchAll(re)];

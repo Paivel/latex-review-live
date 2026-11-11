@@ -8,6 +8,7 @@ import { TEXT_SYMBOLS } from "../preview/symbols";
 import { fieldEdit, figureAt, graphicsPaths, imageCandidates } from "./figure";
 import { VDoc, VImage, buildDoc } from "./model";
 import { parseBbl } from "./bbl";
+import { pdfSize, reactioLabels } from "./figureFiles";
 import { execFile } from "child_process";
 import * as crypto from "crypto";
 
@@ -144,14 +145,17 @@ class Panel {
             const tex = g.kind === "input" ? path.resolve(dir, g.path.endsWith(".tex") ? g.path : g.path + ".tex") : undefined;
             const entry = tex && fs.existsSync(tex) ? tex : undefined;
             // A PDF is shown as a PNG the system draws; until it is ready, or if it cannot be drawn, the page tries pdf.js.
+            const size = /\.pdf$/i.test(p) ? pdfSize(p) : undefined;
+            const labels = entry ? reactioLabels(entry) : undefined;
+            const extra = { file: p, entry, widthPt: size?.w, heightPt: size?.h, labels };
             if (/\.pdf$/i.test(p)) {
               const png = pictureOf(p, path.join(this.storage.fsPath, "pictures"), () => this.schedule(0));
               // The PNG goes to the page as data (once per version): the page cannot always load files from the extension's storage.
-              if (png === "pending") return { name: g.path, uri: null, pdf: false, pending: true, file: p, entry };
-              if (png !== "failed") return { name: g.path, uri: `png:${path.basename(png, ".png")}`, pdf: false, file: p, entry };
+              if (png === "pending") return { name: g.path, uri: null, pdf: false, pending: true, ...extra };
+              if (png !== "failed") return { name: g.path, uri: `png:${path.basename(png, ".png")}`, pdf: false, ...extra };
             }
             const uri = this.panel.webview.asWebviewUri(vscode.Uri.file(p)).with({ query: `v=${stamp(p)}` }).toString();
-            return { name: g.path, uri, pdf: /\.pdf$/i.test(p), file: p, entry };
+            return { name: g.path, uri, pdf: /\.pdf$/i.test(p), ...extra };
           }
         }
         return { name: g.path, uri: null, pdf: false };

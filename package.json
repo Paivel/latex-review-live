@@ -2,7 +2,7 @@
   "name": "latex-review-live",
   "displayName": "LaTeX Review and Live Preview",
   "description": "Track changes with accept/reject, review comments, and an Obsidian-style live preview that hides LaTeX code while you edit.",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.4
+
+- Visual editor: figures are shown at their natural size, as LaTeX sets them (1:1, never wider than the line), scaled with the document's font size.
+- Visual editor: the compound numbers and text Reactio Draw sets over a drawing are shown on it.
+- Visual editor: the reference list also shows for achemso (mcitethebibliography).
+
 ## 0.2.3
 
 - Visual editor: edits are written to the file again after the file was closed and reopened.

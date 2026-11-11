@@ -50,3 +50,17 @@ describe("bbl", () => {
     expect(e[0]).toEqual({ key: "azp", label: "1", tex: String.raw`Carlos R. Azpilcueta-Nicolas, Derek Meng. Dearomatization of Biaryls. \textit{Angewandte Chemie International Edition}, n/a(n/a):e202215422.` });
   });
 });
+
+describe("achemso bbl", () => {
+  it("reads mcitethebibliography", () => {
+    const bbl = String.raw`\begin{mcitethebibliography}{1}
+\bibitem[{A}(){A}]{k1}
+Smith,~J. Title. \emph{J. Am. Chem. Soc.} \textbf{2020}, \emph{1}, 1--2\relax
+\mciteBstWouldAddEndPuncttrue
+\end{mcitethebibliography}`;
+    const r = parseBbl(bbl, new Map([["k1", "1"]]));
+    expect(r.length).toBe(1);
+    expect(r[0].label).toBe("1");
+    expect(r[0].tex).toContain("Smith");
+  });
+});

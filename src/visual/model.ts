@@ -22,6 +22,11 @@ export interface VImage {
   pdf: boolean;
   /** The picture is still being drawn. */
   pending?: boolean;
+  /** Natural size of the picture in pt (PDF MediaBox), shown at that size like \\includegraphics without a width. */
+  widthPt?: number;
+  heightPt?: number;
+  /** Text Reactio Draw sets over the drawing (compound numbers): position as a fraction of the picture, size in pt. */
+  labels?: { x: number; y: number; size: number; tex: string; nodes?: MNode[] }[];
   /** Picture file, and the figure's .tex for an \\input figure (for Reactio Draw). */
   file?: string;
   entry?: string;
@@ -60,6 +65,8 @@ export interface VDoc {
   version: number;
   name: string;
   superCites: boolean;
+  /** Body font size of the document in pt (10, 11 or 12). */
+  fontPt: number;
   tracking: boolean;
   changes: Mark[];
   blocks: VBlock[];
@@ -154,7 +161,7 @@ export function buildDoc(inp: BuildInput): VDoc {
         start: f.start,
         env: base,
         num,
-        images: inp.images(f),
+        images: inp.images(f).map((im) => (im.labels ? { ...im, labels: im.labels.map((l) => ({ ...l, nodes: tokenize(l.tex, look) as MNode[] })) } : im)),
         caption: f.caption ? { start: f.caption.start, end: f.caption.end, nodes: inline(f.caption.start, f.caption.end) } : null,
         label: f.label ? { start: f.label.start, end: f.label.end, text: f.label.text } : null,
       };
@@ -181,12 +188,17 @@ export function buildDoc(inp: BuildInput): VDoc {
   });
   const pre = blocks[0]?.kind === "preamble" ? text.slice(blocks[0].start, blocks[0].end) : "";
   const natbib = /\\usepackage\s*\[([^\]]*)\]\s*\{natbib\}/.exec(pre.replace(/(^|[^\\])%.*$/gm, "$1"));
-  const achemso = /\\documentclass\s*(\[[^\]]*\])?\s*\{achemso\}/.test(pre);
+  const cls = /\\documentclass\s*(?:\[([^\]]*)\])?\s*\{([^}]*)\}/.exec(pre);
+  const achemso = cls?.[2].trim() === "achemso";
+  const size = /\b(1[012])pt\b/.exec(cls?.[1] ?? "");
+  // achemso is 12pt; article and most classes default to 10pt.
+  const fontPt = size ? Number(size[1]) : achemso ? 12 : 10;
   return {
     uri: inp.uri,
     version: inp.version,
     name: inp.name,
     superCites: !!(natbib && /\bsuper\b/.test(natbib[1])) || achemso,
+    fontPt,
     tracking: inp.tracking,
     changes: marks,
     blocks: out,
