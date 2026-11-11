@@ -47,6 +47,8 @@ export interface VBlock {
   };
   /** math */
   tex?: string;
+  /** code block with \\bibliography: the reference list from the last build. */
+  bib?: { label: string; nodes: MNode[] }[];
   /** Whether a tracked change touches the block. */
   changed?: boolean;
 }
@@ -109,6 +111,8 @@ export interface BuildInput {
   look: Lookup;
   tracking: boolean;
   marks: Mark[];
+  /** Entries of the last build's .bbl. */
+  bbl?: { key: string; label: string; tex: string }[];
   /** Picture resolver for a figure's graphic. */
   images: (fig: NonNullable<Block["figure"]>) => VImage[];
 }
@@ -129,6 +133,9 @@ export function buildDoc(inp: BuildInput): VDoc {
   const out: VBlock[] = blocks.map((b) => {
     const vb: VBlock = { kind: b.kind, start: b.start, end: b.end, src: text.slice(b.start, b.end) };
     vb.changed = marks.some((m) => m.curStart <= b.end && (m.curEnd > b.start || (m.curEnd === m.curStart && m.curStart >= b.start)));
+    if (b.kind === "code" && inp.bbl?.length && /\\(bibliography|printbibliography)\b/.test(vb.src)) {
+      vb.bib = inp.bbl.map((e) => ({ label: e.label, nodes: tokenize(e.tex, look) as MNode[] }));
+    }
     if (b.kind === "para") {
       // Leading indentation is kept as plain text so the source keeps it.
       vb.nodes = inline(b.start, b.end);

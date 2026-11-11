@@ -7,7 +7,7 @@ import { VisualEditor } from "./visual/visualEditor";
 
 export function activate(context: vscode.ExtensionContext) {
   const store = new ReviewStore();
-  context.subscriptions.push(store, new TrackChanges(store, context.extensionUri), new Comments(store), new LivePreview(context.workspaceState), new AutoBib(), new VisualEditor(store, context.extensionUri));
+  context.subscriptions.push(store, new TrackChanges(store, context.extensionUri), new Comments(store), new LivePreview(context.workspaceState), new AutoBib(), new VisualEditor(store, context.extensionUri, context.globalStorageUri));
 }
 
 export function deactivate() {}

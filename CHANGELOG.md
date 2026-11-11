@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- Visual editor: PDF figures (Reactio Draw drawings) are drawn by the system (Quick Look on macOS, pdftoppm elsewhere), so they show without the PDF reader in the page.
+- Visual editor: the reference list from the last build (the .bbl) is shown under \bibliography.
+
 ## 0.2.0
 
 - Visual editor (Cmd+Alt+V, or the book button above a .tex file): the document drawn like the PDF in a tab beside the source, and edited there. Paragraphs, headings, bold and italic are typed in place; equations are drawn with KaTeX and edited by clicking; \cite, \ref and compound numbers show their numbers from the last build; figures show their picture (PDF, PNG, JPG, SVG) with the caption and label editable under it. Double-click a figure to edit its drawing in Reactio Draw. Tracked changes show in blue and red, with Accept and Reject on click. The source and the visual editor follow each other.

@@ -54,3 +54,7 @@ details.pre summary { font-family: var(--vscode-font-family); font-size: 12px; c
 .pop button { font: inherit; border: none; border-radius: 4px; padding: 3px 10px; cursor: pointer; color: #fff; }
 .pop button.ok { background: #2e9e44; } .pop button.no { background: #d32f2f; }
 .pic { cursor: pointer; } .pic:hover { outline: 2px solid #c9d3ee; outline-offset: 3px; border-radius: 3px; }
+.refs { margin-top: 1.4em; }
+.bib { font-size: .9em; }
+.bibitem { display: flex; gap: .6em; margin: 0 0 .45em; text-align: left; }
+.biblabel { flex: none; min-width: 2.2em; text-align: right; }

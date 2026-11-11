@@ -189,6 +189,20 @@ function renderBlock(b: VBlock): HTMLElement {
       pre.contentEditable = "plaintext-only";
       pre.spellcheck = false;
       box.appendChild(pre);
+      if (b.bib?.length) {
+        box.appendChild(el("h1", "refs", "References"));
+        const list = el("div", "bib");
+        for (const e of b.bib) {
+          const row = el("div", "bibitem");
+          row.appendChild(el("span", "biblabel", doc?.superCites ? `(${e.label})` : `[${e.label}]`));
+          const t = el("span", "bibtext");
+          renderNodes(t, e.nodes, 0);
+          t.querySelectorAll(".atom").forEach((a) => { (a as HTMLElement).style.pointerEvents = "none"; });
+          row.appendChild(t);
+          list.appendChild(row);
+        }
+        box.appendChild(list);
+      }
       break;
     }
     case "tail":
@@ -220,7 +234,7 @@ async function drawPdf(uri: string, holder: HTMLElement) {
     let p = pdfCache.get(uri);
     if (!p) {
       p = (async () => {
-        const lib = await loadPdfjs();
+        const lib = await Promise.race([loadPdfjs(), new Promise((_, no) => setTimeout(() => no(new Error("the PDF reader did not load")), 8000))]) as any;
         const d = await lib.getDocument({ url: uri, isEvalSupported: false }).promise;
         const pg = await d.getPage(1);
         const vp = pg.getViewport({ scale: 3 });
@@ -242,6 +256,7 @@ async function drawPdf(uri: string, holder: HTMLElement) {
     holder.textContent = "";
     holder.appendChild(c);
   } catch (e) {
+    pdfCache.delete(uri);
     holder.textContent = `Could not draw the PDF: ${(e as Error)?.message ?? e}`;
     holder.className = "missing";
   }

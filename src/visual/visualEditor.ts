@@ -7,6 +7,9 @@ import { readAux } from "../preview/aux";
 import { TEXT_SYMBOLS } from "../preview/symbols";
 import { fieldEdit, figureAt, graphicsPaths, imageCandidates } from "./figure";
 import { VDoc, VImage, buildDoc } from "./model";
+import { parseBbl } from "./bbl";
+import { execFile } from "child_process";
+import * as crypto from "crypto";
 
 type FromPage =
   | { type: "ready" }
@@ -26,7 +29,7 @@ export class VisualEditor implements vscode.Disposable {
   private panels = new Map<string, Panel>();
   private disposables: vscode.Disposable[] = [];
 
-  constructor(private store: ReviewStore, private extensionUri: vscode.Uri) {
+  constructor(private store: ReviewStore, private extensionUri: vscode.Uri, private storage: vscode.Uri) {
     this.disposables.push(
       vscode.commands.registerCommand("latexReview.openVisualEditor", (uri?: vscode.Uri) => this.open(uri)),
       vscode.workspace.onDidChangeTextDocument((e) => this.panels.get(e.document.uri.toString())?.schedule(60)),
@@ -49,7 +52,7 @@ export class VisualEditor implements vscode.Disposable {
     const key = doc.uri.toString();
     const have = this.panels.get(key);
     if (have) return have.panel.reveal(vscode.ViewColumn.Beside);
-    const p = new Panel(doc, this.store, this.extensionUri, () => this.panels.delete(key));
+    const p = new Panel(doc, this.store, this.extensionUri, this.storage, () => this.panels.delete(key));
     this.panels.set(key, p);
   }
 
@@ -65,9 +68,9 @@ class Panel {
   private refresh = false;
   private ready = false;
 
-  constructor(private doc: vscode.TextDocument, private store: ReviewStore, private extensionUri: vscode.Uri, onClose: () => void) {
+  constructor(private doc: vscode.TextDocument, private store: ReviewStore, private extensionUri: vscode.Uri, private storage: vscode.Uri, onClose: () => void) {
     const dir = vscode.Uri.file(path.dirname(doc.uri.fsPath));
-    const roots = [vscode.Uri.joinPath(extensionUri, "dist"), dir, ...(vscode.workspace.workspaceFolders ?? []).map((f) => f.uri)];
+    const roots = [vscode.Uri.joinPath(extensionUri, "dist"), vscode.Uri.joinPath(storage, "pictures"), dir, ...(vscode.workspace.workspaceFolders ?? []).map((f) => f.uri)];
     this.panel = vscode.window.createWebviewPanel("latexReview.visual", `Visual: ${path.basename(doc.fileName)}`, { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false }, {
       enableScripts: true,
       retainContextWhenHidden: true,
@@ -115,14 +118,23 @@ class Panel {
         for (const c of imageCandidates(g, gpaths)) {
           const p = path.resolve(dir, c);
           if (fs.existsSync(p) && fs.statSync(p).isFile()) {
-            const uri = this.panel.webview.asWebviewUri(vscode.Uri.file(p)).with({ query: `v=${stamp(p)}` }).toString();
             const tex = g.kind === "input" ? path.resolve(dir, g.path.endsWith(".tex") ? g.path : g.path + ".tex") : undefined;
-            return { name: g.path, uri, pdf: /\.pdf$/i.test(p), file: p, entry: tex && fs.existsSync(tex) ? tex : undefined };
+            const entry = tex && fs.existsSync(tex) ? tex : undefined;
+            // A PDF is shown as a PNG the system draws; until it is ready, or if it cannot be drawn, the page tries pdf.js.
+            const png = /\.pdf$/i.test(p) ? pictureOf(p, path.join(this.storage.fsPath, "pictures"), () => this.schedule(0)) : null;
+            const file = png ?? p;
+            const uri = this.panel.webview.asWebviewUri(vscode.Uri.file(file)).with({ query: `v=${stamp(file)}` }).toString();
+            return { name: g.path, uri, pdf: !png && /\.pdf$/i.test(p), file: p, entry };
           }
         }
         return { name: g.path, uri: null, pdf: false };
       });
+    let bbl;
+    try {
+      bbl = parseBbl(fs.readFileSync(aux.replace(/\.aux$/, ".bbl"), "utf8"), refs.cites);
+    } catch { /* no bibliography built yet */ }
     return buildDoc({
+      bbl,
       text,
       uri: doc.uri.toString(),
       version: doc.version,
@@ -214,4 +226,49 @@ class Panel {
 <script nonce="${nonce}" src="${dist("visual.js")}"></script>
 </body></html>`;
   }
+}
+
+// ---- PDF pictures as PNG ---------------------------------------------------
+
+const pictures = new Map<string, string | "pending" | "failed">();
+
+/**
+ * A PNG of a PDF's first page, drawn by the system (Quick Look or sips on
+ * macOS, pdftoppm elsewhere) and cached by the file's version. Returns null
+ * while it is being drawn (onReady is called when done) or when it cannot be.
+ */
+function pictureOf(pdf: string, cacheDir: string, onReady: () => void): string | null {
+  let st: fs.Stats;
+  try { st = fs.statSync(pdf); } catch { return null; }
+  const id = crypto.createHash("sha1").update(`${pdf}|${st.mtimeMs}|${st.size}`).digest("hex").slice(0, 16);
+  const out = path.join(cacheDir, `${id}.png`);
+  const have = pictures.get(id);
+  if (have && have !== "pending" && have !== "failed") return have;
+  if (have) return null;
+  if (fs.existsSync(out)) { pictures.set(id, out); return out; }
+  pictures.set(id, "pending");
+  void drawPng(pdf, out).then((ok) => { pictures.set(id, ok ? out : "failed"); if (ok) onReady(); });
+  return null;
+}
+
+function run(cmd: string, args: string[]): Promise<boolean> {
+  return new Promise((resolve) => execFile(cmd, args, { timeout: 20000 }, (err) => resolve(!err)));
+}
+
+async function drawPng(pdf: string, out: string): Promise<boolean> {
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  if (process.platform === "darwin") {
+    // Quick Look draws the vector page at the asked size; sips is the fallback (72 dpi).
+    const tmp = fs.mkdtempSync(path.join(path.dirname(out), "ql-"));
+    try {
+      if (await run("qlmanage", ["-t", "-s", "1800", "-o", tmp, pdf])) {
+        const made = fs.readdirSync(tmp).find((f) => f.endsWith(".png"));
+        if (made) { fs.renameSync(path.join(tmp, made), out); return true; }
+      }
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+    return (await run("sips", ["-s", "format", "png", pdf, "--out", out])) && fs.existsSync(out);
+  }
+  return (await run("pdftoppm", ["-png", "-r", "200", "-singlefile", pdf, out.replace(/\.png$/, "")])) && fs.existsSync(out);
 }
