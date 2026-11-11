@@ -51,18 +51,28 @@ export function parseSynctexEdit(out: string): { input: string; line: number } |
   return input && line > 0 ? { input, line } : null;
 }
 
+export const NO_CHANGES_PKG = "Tracked changes are not shown: install the LaTeX package 'changes' (tlmgr install changes, or the MiKTeX console).";
+
+/** The log of a run that stopped because changes.sty is not installed. */
+export function missingChanges(log: string): boolean {
+  return /File `changes\.sty' not found/.test(log);
+}
+
 export class LivePdf {
   private timer: NodeJS.Timeout | undefined;
   private proc: ChildProcess | undefined;
   private again = false;
   private disposed = false;
+  /** False once a build showed the changes package is not installed: tracked changes are then left out. */
+  private marks = true;
   readonly dir: string;
   readonly outDir: string;
   readonly copy: string;
 
   constructor(
     private texFile: string,
-    private text: () => string,
+    /** The text to build; with marks, tracked changes as changes-package markup on the same lines. */
+    private text: (marks: boolean) => string,
     private onPdf: (pdf: Buffer) => void,
     private onStatus: (s: LiveStatus) => void,
   ) {
@@ -85,7 +95,8 @@ export class LivePdf {
     if (this.disposed) return;
     if (this.proc) { this.again = true; return; }
     fs.mkdirSync(this.outDir, { recursive: true });
-    const text = this.text();
+    const marked = this.marks;
+    const text = this.text(marked);
     fs.writeFileSync(this.copy, text);
     // A bibliography made by an earlier build beside the file is used until latexmk makes its own.
     const bbl = path.basename(this.copy).replace(/\.tex$/i, ".bbl");
@@ -112,9 +123,15 @@ export class LivePdf {
       if (err) {
         let log = `${stdout}\n${stderr}`;
         try { log = fs.readFileSync(this.copy.replace(/\.tex$/i, ".log"), "utf8"); } catch { /* none */ }
+        if (marked && missingChanges(log)) {
+          // TeX Live basic and a fresh MiKTeX may lack the package; show the PDF without the marks rather than none.
+          this.marks = false;
+          this.build();
+          return;
+        }
         const errs = logErrors(log);
         this.onStatus({ state: "error", text: errs.length ? errs.join(" · ") : "The build failed; see the log in .latex-review/live." });
-      } else this.onStatus({ state: "ok", text: "" });
+      } else this.onStatus({ state: "ok", text: marked ? "" : NO_CHANGES_PKG });
       if (this.again) { this.again = false; this.build(); }
     });
   }

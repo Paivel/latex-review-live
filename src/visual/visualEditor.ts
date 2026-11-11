@@ -12,6 +12,7 @@ import { pdfSize, reactioLabels } from "./figureFiles";
 import { execFile } from "child_process";
 import * as crypto from "crypto";
 import { LivePdf } from "./livePdf";
+import { markUp } from "../review/markup";
 
 type FromPage =
   | { type: "ready" }
@@ -59,7 +60,12 @@ export class VisualEditor implements vscode.Disposable {
         p?.edited();
       }),
       vscode.workspace.onDidSaveTextDocument((d) => this.panels.get(d.uri.toString())?.schedule(300)),
-      store.onDidChange((r) => this.panels.get(r.uri.toString())?.schedule(30)),
+      store.onDidChange((r) => {
+        const p = this.panels.get(r.uri.toString());
+        p?.schedule(30);
+        // Accept, reject, a comment or tracking on/off changes the marked-up PDF too.
+        p?.edited();
+      }),
       vscode.window.onDidChangeTextEditorSelection((e) => {
         if (e.kind === vscode.TextEditorSelectionChangeKind.Command) return;
         this.panels.get(e.textEditor.document.uri.toString())?.cursor(e.textEditor.document.offsetAt(e.selections[0].active));
@@ -136,7 +142,13 @@ class Panel {
     if (this.live) return;
     const live = new LivePdf(
       this.opened.uri.fsPath,
-      () => this.doc.getText(),
+      (marks) => {
+        const text = this.doc.getText();
+        const r = this.store.peek(this.doc);
+        if (!marks || !r?.tracking) return text;
+        this.store.recompute(r, this.doc);
+        return markUp(text, r.changes, r.data.threads.filter((t) => !t.resolved), { sameLines: true }).text;
+      },
       (pdf) => void this.panel.webview.postMessage({ type: "pdf", data: pdf.toString("base64") }),
       (s) => void this.panel.webview.postMessage({ type: "pdfStatus", ...s }),
     );

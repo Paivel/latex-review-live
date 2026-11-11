@@ -87,7 +87,9 @@ export function escapeTeX(s: string): string {
  * A copy of the document with tracked changes as \added, \deleted and \replaced
  * and open comments as \comment, for a PDF to send to co-authors.
  */
-export function markUp(text: string, changes: Change[], threads: StoredThread[]): { text: string; plain: number } {
+export function markUp(text: string, changes: Change[], threads: StoredThread[], opts: { sameLines?: boolean } = {}): { text: string; plain: number } {
+  // sameLines: every line stays on its line number (deleted text joins one line), so SyncTeX lines are the document's.
+  const del = (s: string) => (opts.sameLines ? s.replace(/\s*\n\s*/g, " ") : s);
   const inMath = mathMap(text);
   type Ins = { at: number; end: number; text: string };
   const ops: Ins[] = [];
@@ -100,8 +102,8 @@ export function markUp(text: string, changes: Change[], threads: StoredThread[])
     }
     let rep: string;
     if (c.deleted === "") rep = `\\added{${c.inserted}}`;
-    else if (c.inserted === "") rep = `\\deleted{${c.deleted}}`;
-    else rep = `\\replaced{${c.inserted}}{${c.deleted}}`;
+    else if (c.inserted === "") rep = `\\deleted{${del(c.deleted)}}`;
+    else rep = `\\replaced{${c.inserted}}{${del(c.deleted)}}`;
     ops.push({ at: c.curStart, end: c.curEnd, text: rep });
   }
   for (const t of threads) {
@@ -116,7 +118,11 @@ export function markUp(text: string, changes: Change[], threads: StoredThread[])
   for (const op of ops) out = out.slice(0, op.at) + op.text + out.slice(op.end);
 
   const pkg = "\\usepackage[markup=default]{changes}% added by LaTeX Review\n";
-  if (!/\\usepackage(\[[^\]]*\])?\{changes\}/.test(out)) {
+  if (!/\\usepackage(\[[^\]]*\])?\{changes\}/.test(out) && opts.sameLines) {
+    // Right after \documentclass{..}, on its line.
+    const m = /\\documentclass(\[[^\]]*\])?\{[^}]*\}/.exec(out);
+    if (m) out = out.slice(0, m.index + m[0].length) + "\\usepackage[markup=default]{changes}" + out.slice(m.index + m[0].length);
+  } else if (!/\\usepackage(\[[^\]]*\])?\{changes\}/.test(out)) {
     const m = /\\documentclass(\[[^\]]*\])?\{[^}]*\}[^\n]*\n/.exec(out);
     if (m) out = out.slice(0, m.index + m[0].length) + pkg + out.slice(m.index + m[0].length);
     else {

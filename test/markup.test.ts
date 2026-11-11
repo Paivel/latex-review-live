@@ -42,3 +42,16 @@ describe("mathMap", () => {
     expect(m(t.indexOf("e", t.indexOf("\\$")))).toBe(false);
   });
 });
+
+describe("markUp for the PDF view", () => {
+  it("keeps every line on its number", async () => {
+    const { markUp } = await import("../src/review/markup");
+    const { computeChanges } = await import("../src/review/diff");
+    const base = "\\documentclass{article}\n\\begin{document}\nOne two\nthree four.\n\nFive.\n\\end{document}\n";
+    const cur = "\\documentclass{article}\n\\begin{document}\nOne four.\n\nFive six.\n\\end{document}\n";
+    const out = markUp(cur, computeChanges(base, cur), [], { sameLines: true }).text;
+    expect(out.split("\n").length).toBe(cur.split("\n").length);
+    expect(out.split("\n")[0]).toContain("{changes}");
+    expect(out).toContain("\\deleted{two three }");
+  });
+});

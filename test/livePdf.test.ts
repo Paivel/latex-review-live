@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { engineFlag, logErrors, parseSynctexEdit } from "../src/visual/livePdf";
+import { engineFlag, logErrors, missingChanges, parseSynctexEdit } from "../src/visual/livePdf";
 
 describe("live PDF helpers", () => {
   it("picks the engine from a magic comment", () => {
@@ -16,5 +16,9 @@ describe("live PDF helpers", () => {
     const out = "This is SyncTeX command line utility, version 1.5\nSyncTeX result begin\nOutput:/a/main.pdf\nInput:/a/./main.tex\nLine:42\nColumn:-1\nOffset:0\nContext:\nSyncTeX result end\n";
     expect(parseSynctexEdit(out)).toEqual({ input: "/a/./main.tex", line: 42 });
     expect(parseSynctexEdit("SyncTeX result begin\nSyncTeX result end\n")).toBeNull();
+  });
+  it("sees a missing changes package in the log", () => {
+    expect(missingChanges("! LaTeX Error: File `changes.sty' not found.\n")).toBe(true);
+    expect(missingChanges("! LaTeX Error: File `achemso.sty' not found.\n")).toBe(false);
   });
 });

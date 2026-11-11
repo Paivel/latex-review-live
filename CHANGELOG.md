@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.6
+
+- PDF view: while tracking is on, tracked changes show in the built PDF (insertions coloured, deletions struck through, open comments as notes), with the changes package and every line on its own line so clicks still find the source. Accept and reject rebuild it. Without the changes package installed, the PDF is built without the marks and the status says how to install it.
+
 ## 0.5.5
 
 - Visual editor: a click beside the text (right of a list item, caption or title, or on an empty list item) puts the caret at the end of that line.

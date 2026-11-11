@@ -36,7 +36,7 @@ The review is kept beside the document in `.latex-review/<name>.tex.json`: the t
 
 Every edit goes straight into the `.tex`; the source and the visual editor scroll to each other, and double-clicking text shows it in the source.
 
-**PDF view.** The PDF button in the bar shows the real pages instead, built by `latexmk` a moment after each edit (unsaved text included, output in `.latex-review/live`). Click a paragraph, heading, list or equation and it opens over the page in the visual editor; Done or Esc closes it and the next build shows it typeset. Needs TeX Live or MiKTeX with `latexmk` and `synctex` (on Windows, MiKTeX's latexmk needs Perl), and a trusted workspace.
+**PDF view.** The PDF button in the bar shows the real pages instead, built by `latexmk` a moment after each edit (unsaved text included, output in `.latex-review/live`). Click a paragraph, heading, list or equation and it opens over the page in the visual editor; Done or Esc closes it and the next build shows it typeset. Needs TeX Live or MiKTeX with `latexmk` and `synctex` (on Windows, MiKTeX's latexmk needs Perl), and a trusted workspace. While tracking is on, the pages show the tracked changes and open comments with the `changes` package (`tlmgr install changes` if TeX Live basic lacks it).
 
 In the `.tex` editor too, Cmd+B, Cmd+I and Cmd+U wrap the selection in `\textbf{}`, `\textit{}` or `\underline{}`, and take it out again.
 
