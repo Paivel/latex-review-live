@@ -131,6 +131,7 @@ function renderBlock(b: VBlock): HTMLElement {
       const pics = el("div", "pics");
       if (!f.images.length) pics.appendChild(el("div", "missing", "This figure has no picture."));
       for (const im of f.images) {
+        if (im.pending) { pics.appendChild(el("div", "missing", `Drawing ${im.name}…`)); continue; }
         if (!im.uri) { pics.appendChild(el("div", "missing", `No picture found for ${im.name}`)); continue; }
         const pic = el("div", "pic");
         pic.title = "Double-click to edit the drawing";
@@ -142,7 +143,7 @@ function renderBlock(b: VBlock): HTMLElement {
           void drawPdf(im.uri, holder);
         } else {
           const img = el("img");
-          img.src = im.uri;
+          img.src = im.uri.startsWith("png:") ? pictureData.get(im.uri.slice(4)) ?? "" : im.uri;
           img.alt = im.name;
           pic.appendChild(img);
         }
@@ -216,15 +217,22 @@ function sliceOf(b: VBlock, start: number, end: number): string {
   return b.src.slice(start - b.start, end - b.start);
 }
 
+// PNGs of PDF figures, sent once by the extension.
+const pictureData = new Map<string, string>();
+
 // PDFs drawn once per file version and copied for every use.
 const pdfCache = new Map<string, Promise<HTMLCanvasElement>>();
 let pdfjs: Promise<any> | null = null;
 function loadPdfjs(): Promise<any> {
   pdfjs ??= (async () => {
     const lib = await import(/* @vite-ignore */ window.PDFJS_URL);
+    // A module worker cannot be loaded straight from the webview's resource host; load it from a blob.
     try {
+      const code = await (await fetch(window.PDFJS_WORKER)).text();
+      lib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
+    } catch {
       lib.GlobalWorkerOptions.workerSrc = window.PDFJS_WORKER;
-    } catch { /* set below */ }
+    }
     return lib;
   })();
   return pdfjs;
@@ -750,6 +758,17 @@ page.addEventListener("click", (ev) => {
   if (pop && !pop.contains(t)) closePop();
 });
 
+// Double-click on text: show that word in the source.
+page.addEventListener("dblclick", (ev) => {
+  if ((ev.target as HTMLElement).closest(".pic")) return;
+  setTimeout(() => {
+    const sel = getSelection();
+    const o = caretOffset();
+    if (o === null) return;
+    vscode.postMessage({ type: "jump", offset: o, length: sel && !sel.isCollapsed ? sel.toString().length : 0 });
+  }, 0);
+});
+
 document.addEventListener("mousedown", (ev) => {
   if (pop && !pop.contains(ev.target as Node) && !(ev.target as HTMLElement).closest(".ins, .del, .atom")) closePop();
 });
@@ -769,6 +788,7 @@ document.addEventListener("selectionchange", () => {
 
 window.addEventListener("message", (e) => {
   const m = e.data;
+  if (m.type === "pictures") for (const [k, v] of Object.entries(m.items as Record<string, string>)) pictureData.set(k, v);
   if (m.type === "doc") render(m.doc, !!m.refresh);
   if (m.type === "cursor") {
     if (document.hasFocus() && page.contains(document.activeElement)) return;
@@ -783,4 +803,6 @@ window.addEventListener("message", (e) => {
     }
   }
 });
+window.addEventListener("error", (e) => vscode.postMessage({ type: "log", text: `error: ${e.message} @${e.lineno}` }));
+window.addEventListener("unhandledrejection", (e) => vscode.postMessage({ type: "log", text: `rejection: ${(e.reason as Error)?.message ?? e.reason}` }));
 vscode.postMessage({ type: "ready" });

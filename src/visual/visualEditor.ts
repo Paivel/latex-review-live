@@ -16,6 +16,7 @@ type FromPage =
   | { type: "edit"; start: number; end: number; old: string; text: string }
   | { type: "field"; fig: number; which: "caption" | "label"; value: string }
   | { type: "join"; start: number; end: number }
+  | { type: "jump"; offset: number; length: number }
   | { type: "reveal"; offset: number }
   | { type: "decide"; accept: boolean; curStart: number; curEnd: number }
   | { type: "source" }
@@ -64,23 +65,34 @@ export class VisualEditor implements vscode.Disposable {
 
 class Panel {
   readonly panel: vscode.WebviewPanel;
+  /** The open document for this file now: closing and reopening a file gives a new document object. */
+  private get doc(): vscode.TextDocument {
+    const k = this.opened.uri.toString();
+    const now = vscode.workspace.textDocuments.find((d) => d.uri.toString() === k && !d.isClosed);
+    if (now) this.opened = now;
+    return this.opened;
+  }
   private timer: NodeJS.Timeout | undefined;
   private refresh = false;
   private ready = false;
+  /** PNGs the page already has. */
+  private sentPictures = new Set<string>();
 
-  constructor(private doc: vscode.TextDocument, private store: ReviewStore, private extensionUri: vscode.Uri, private storage: vscode.Uri, onClose: () => void) {
-    const dir = vscode.Uri.file(path.dirname(doc.uri.fsPath));
+  constructor(private opened: vscode.TextDocument, private store: ReviewStore, private extensionUri: vscode.Uri, private storage: vscode.Uri, onClose: () => void) {
+    const dir = vscode.Uri.file(path.dirname(opened.uri.fsPath));
     const roots = [vscode.Uri.joinPath(extensionUri, "dist"), vscode.Uri.joinPath(storage, "pictures"), dir, ...(vscode.workspace.workspaceFolders ?? []).map((f) => f.uri)];
-    this.panel = vscode.window.createWebviewPanel("latexReview.visual", `Visual: ${path.basename(doc.fileName)}`, { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false }, {
+    this.panel = vscode.window.createWebviewPanel("latexReview.visual", `Visual: ${path.basename(opened.fileName)}`, { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false }, {
       enableScripts: true,
       retainContextWhenHidden: true,
       localResourceRoots: roots,
     });
     this.panel.iconPath = vscode.Uri.joinPath(extensionUri, "images", "icon.png");
     this.panel.webview.html = this.html();
-    this.panel.webview.onDidReceiveMessage((m: FromPage) => void this.receive(m));
+    this.panel.webview.onDidReceiveMessage((m: FromPage) =>
+      this.receive(m).catch((e) => void vscode.window.showErrorMessage(`Visual editor: ${(e as Error)?.message ?? e}`)),
+    );
     this.panel.onDidDispose(() => { clearTimeout(this.timer); onClose(); });
-    void store.get(doc).then(() => this.schedule(0));
+    void store.get(opened).then(() => this.schedule(0));
   }
 
   schedule(delay: number, refresh = false) {
@@ -96,7 +108,18 @@ class Panel {
 
   private send() {
     if (!this.ready) return;
-    void this.panel.webview.postMessage({ type: "doc", doc: this.build(), refresh: this.refresh });
+    const doc = this.build();
+    const fresh: Record<string, string> = {};
+    for (const b of doc.blocks) for (const im of b.fig?.images ?? []) {
+      const id = im.uri?.startsWith("png:") ? im.uri.slice(4) : null;
+      if (!id || this.sentPictures.has(id)) continue;
+      try {
+        fresh[id] = `data:image/png;base64,${fs.readFileSync(path.join(this.storage.fsPath, "pictures", `${id}.png`)).toString("base64")}`;
+        this.sentPictures.add(id);
+      } catch { /* removed from the cache */ }
+    }
+    if (Object.keys(fresh).length) void this.panel.webview.postMessage({ type: "pictures", items: fresh });
+    void this.panel.webview.postMessage({ type: "doc", doc, refresh: this.refresh });
     this.refresh = false;
   }
 
@@ -121,10 +144,14 @@ class Panel {
             const tex = g.kind === "input" ? path.resolve(dir, g.path.endsWith(".tex") ? g.path : g.path + ".tex") : undefined;
             const entry = tex && fs.existsSync(tex) ? tex : undefined;
             // A PDF is shown as a PNG the system draws; until it is ready, or if it cannot be drawn, the page tries pdf.js.
-            const png = /\.pdf$/i.test(p) ? pictureOf(p, path.join(this.storage.fsPath, "pictures"), () => this.schedule(0)) : null;
-            const file = png ?? p;
-            const uri = this.panel.webview.asWebviewUri(vscode.Uri.file(file)).with({ query: `v=${stamp(file)}` }).toString();
-            return { name: g.path, uri, pdf: !png && /\.pdf$/i.test(p), file: p, entry };
+            if (/\.pdf$/i.test(p)) {
+              const png = pictureOf(p, path.join(this.storage.fsPath, "pictures"), () => this.schedule(0));
+              // The PNG goes to the page as data (once per version): the page cannot always load files from the extension's storage.
+              if (png === "pending") return { name: g.path, uri: null, pdf: false, pending: true, file: p, entry };
+              if (png !== "failed") return { name: g.path, uri: `png:${path.basename(png, ".png")}`, pdf: false, file: p, entry };
+            }
+            const uri = this.panel.webview.asWebviewUri(vscode.Uri.file(p)).with({ query: `v=${stamp(p)}` }).toString();
+            return { name: g.path, uri, pdf: /\.pdf$/i.test(p), file: p, entry };
           }
         }
         return { name: g.path, uri: null, pdf: false };
@@ -146,20 +173,42 @@ class Panel {
     });
   }
 
+  /** Diagnostics: what the page sent and what came of it, in .latex-review/visual-log.txt beside the document. */
+  private log(line: string) {
+    try {
+      const dir = path.join(path.dirname(this.opened.uri.fsPath), ".latex-review");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.appendFileSync(path.join(dir, "visual-log.txt"), `${new Date().toISOString()} ${line}\n`);
+    } catch { /* read-only folder */ }
+  }
+
   private async receive(m: FromPage) {
     const doc = this.doc;
+    // Page errors only; a normal session writes nothing.
+    if ((m as { type: string }).type === "log") return this.log(`page: ${(m as unknown as { text: string }).text}`);
     switch (m.type) {
       case "ready":
         this.ready = true;
+        this.sentPictures.clear();
         this.schedule(0, true);
         return;
       case "edit": {
         const text = doc.getText();
-        if (text.slice(m.start, m.end) !== m.old) return this.schedule(0, true);
+        if (text.slice(m.start, m.end) !== m.old) {
+          this.log(`edit out of date at ${m.start}..${m.end}: page had ${JSON.stringify(m.old).slice(0, 100)}, file has ${JSON.stringify(text.slice(m.start, m.end)).slice(0, 100)}`);
+          // The page drew an older text: redraw it from the source.
+          console.warn("latex-review visual: edit out of date", m.start, m.end);
+          return this.schedule(0, true);
+        }
         if (m.old === m.text) return;
         const edit = new vscode.WorkspaceEdit();
         edit.replace(doc.uri, new vscode.Range(doc.positionAt(m.start), doc.positionAt(m.end)), m.text);
-        if (!(await applyOwnEdit(doc.uri, edit))) this.schedule(0, true);
+        const ok = await applyOwnEdit(doc.uri, edit);
+        if (!ok) {
+          this.log(`edit not applied at ${m.start}..${m.end} (doc v${doc.version})`);
+          void vscode.window.showWarningMessage("Visual editor: the edit could not be written to the file.");
+          this.schedule(0, true);
+        }
         return;
       }
       case "join": {
@@ -186,7 +235,7 @@ class Panel {
       }
       case "reveal": {
         if (!vscode.workspace.getConfiguration("latexReview.visual").get("followCursor", true)) return;
-        const ed = vscode.window.visibleTextEditors.find((e) => e.document === doc);
+        const ed = vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === doc.uri.toString());
         if (!ed) return;
         const p = doc.positionAt(m.offset);
         ed.revealRange(new vscode.Range(p, p), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
@@ -194,6 +243,14 @@ class Panel {
       }
       case "decide":
         return vscode.commands.executeCommand(m.accept ? "latexReview.acceptChange" : "latexReview.rejectChange", { uri: doc.uri.toString(), curStart: m.curStart, curEnd: m.curEnd });
+      case "jump": {
+        const a = doc.positionAt(m.offset);
+        const b = doc.positionAt(m.offset + Math.max(0, m.length));
+        const shown = vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === doc.uri.toString());
+        const ed = await vscode.window.showTextDocument(doc, { viewColumn: shown?.viewColumn ?? vscode.ViewColumn.One, preserveFocus: false, selection: new vscode.Range(a, b) });
+        ed.revealRange(new vscode.Range(a, b), vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+        return;
+      }
       case "editFigure": {
         // Reactio Draw opens the drawing a figure was made from; otherwise open the picture itself.
         const target = vscode.Uri.file(m.entry ?? m.file);
@@ -234,21 +291,21 @@ const pictures = new Map<string, string | "pending" | "failed">();
 
 /**
  * A PNG of a PDF's first page, drawn by the system (Quick Look or sips on
- * macOS, pdftoppm elsewhere) and cached by the file's version. Returns null
- * while it is being drawn (onReady is called when done) or when it cannot be.
+ * macOS, pdftoppm elsewhere) and cached by the file's version. Returns
+ * "pending" while it is being drawn (onReady is called when done) and
+ * "failed" when it cannot be.
  */
-function pictureOf(pdf: string, cacheDir: string, onReady: () => void): string | null {
+function pictureOf(pdf: string, cacheDir: string, onReady: () => void): string {
   let st: fs.Stats;
-  try { st = fs.statSync(pdf); } catch { return null; }
+  try { st = fs.statSync(pdf); } catch { return "failed"; }
   const id = crypto.createHash("sha1").update(`${pdf}|${st.mtimeMs}|${st.size}`).digest("hex").slice(0, 16);
   const out = path.join(cacheDir, `${id}.png`);
   const have = pictures.get(id);
-  if (have && have !== "pending" && have !== "failed") return have;
-  if (have) return null;
-  if (fs.existsSync(out)) { pictures.set(id, out); return out; }
+  if (have) return have;
+  if (fs.existsSync(out) && fs.statSync(out).size > 0) { pictures.set(id, out); return out; }
   pictures.set(id, "pending");
-  void drawPng(pdf, out).then((ok) => { pictures.set(id, ok ? out : "failed"); if (ok) onReady(); });
-  return null;
+  void drawPng(pdf, out).then((ok) => { pictures.set(id, ok ? out : "failed"); onReady(); });
+  return "pending";
 }
 
 function run(cmd: string, args: string[]): Promise<boolean> {

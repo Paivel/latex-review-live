@@ -20,6 +20,8 @@ export interface VImage {
   /** Webview URI of the picture, or null when not found. */
   uri: string | null;
   pdf: boolean;
+  /** The picture is still being drawn. */
+  pending?: boolean;
   /** Picture file, and the figure's .tex for an \\input figure (for Reactio Draw). */
   file?: string;
   entry?: string;

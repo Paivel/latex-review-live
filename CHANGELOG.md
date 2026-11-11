@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.3
+
+- Visual editor: edits are written to the file again after the file was closed and reopened.
+- Visual editor: PDF figures are sent to the page as pictures, so they show in VS Code (the page could not load them from the extension's storage). While a picture is being drawn the figure says so.
+- Visual editor: double-click text to show that place in the source, selected.
+- Visual editor: problems in the page are written to .latex-review/visual-log.txt beside the document.
+
 ## 0.2.1
 
 - Visual editor: PDF figures (Reactio Draw drawings) are drawn by the system (Quick Look on macOS, pdftoppm elsewhere), so they show without the PDF reader in the page.
