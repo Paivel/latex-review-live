@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Live preview (the mode that hid LaTeX code in the editor) is removed: the visual editor replaces it. Its settings, colours, the eye button and Cmd+Alt+P are gone.
+- The visual editor's button is now an eye (the book looked like Split Editor).
+- Renamed to "LaTeX Review and Visual Editor".
+
 ## 0.2.6
 
 - Cmd+B, Cmd+I and Cmd+U (Ctrl on Windows and Linux) in a .tex editor wrap the selection in \textbf{..}, \textit{..} or \underline{..}; with the caret or selection already inside one, they take it out again. With no selection they insert an empty group.

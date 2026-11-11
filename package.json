@@ -1,8 +1,8 @@
 {
   "name": "latex-review-live",
-  "displayName": "LaTeX Review and Live Preview",
-  "description": "Track changes with accept/reject, review comments, and an Obsidian-style live preview that hides LaTeX code while you edit.",
-  "version": "0.2.6",
+  "displayName": "LaTeX Review and Visual Editor",
+  "description": "Track changes with accept/reject, review comments, and a visual editor that shows the document like the PDF and lets you edit it there.",
+  "version": "0.3.0",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
@@ -17,8 +17,8 @@
     "track changes",
     "review",
     "comments",
-    "live preview",
-    "wysiwyg"
+    "wysiwyg",
+    "visual editor"
   ],
   "main": "./dist/extension.js",
   "extensionKind": [
@@ -40,7 +40,7 @@
         "command": "latexReview.openVisualEditor",
         "title": "Open Visual Editor",
         "category": "LaTeX Review",
-        "icon": "$(book)"
+        "icon": "$(eye)"
       },
       {
         "command": "latexReview.formatSource",
@@ -56,24 +56,6 @@
         "command": "latexReview.updateBibliography",
         "title": "Update Bibliography from Zotero",
         "category": "LaTeX Review"
-      },
-      {
-        "command": "latexReview.toggleLivePreview",
-        "title": "Toggle Live Preview",
-        "category": "LaTeX Review",
-        "icon": "$(eye)"
-      },
-      {
-        "command": "latexReview.showSource",
-        "title": "Show Source",
-        "category": "LaTeX Review",
-        "icon": "$(code)"
-      },
-      {
-        "command": "latexReview.showLivePreview",
-        "title": "Show Live Preview",
-        "category": "LaTeX Review",
-        "icon": "$(eye)"
       },
       {
         "command": "latexReview.startTracking",
@@ -187,12 +169,6 @@
     ],
     "keybindings": [
       {
-        "command": "latexReview.toggleLivePreview",
-        "key": "ctrl+alt+p",
-        "mac": "cmd+alt+p",
-        "when": "editorTextFocus && editorLangId =~ /^(latex|tex)$/"
-      },
-      {
         "command": "latexReview.nextChange",
         "key": "ctrl+alt+]",
         "mac": "cmd+alt+]",
@@ -279,16 +255,6 @@
     },
     "menus": {
       "editor/title": [
-        {
-          "command": "latexReview.showLivePreview",
-          "when": "editorLangId =~ /^(latex|tex)$/ && !latexReview.livePreview",
-          "group": "navigation@50"
-        },
-        {
-          "command": "latexReview.showSource",
-          "when": "editorLangId =~ /^(latex|tex)$/ && latexReview.livePreview",
-          "group": "navigation@50"
-        },
         {
           "command": "latexReview.openVisualEditor",
           "when": "editorLangId =~ /^(latex|tex)$/",
@@ -467,42 +433,12 @@
       ]
     },
     "configuration": {
-      "title": "LaTeX Review and Live Preview",
+      "title": "LaTeX Review and Visual Editor",
       "properties": {
         "latexReview.author": {
           "type": "string",
           "default": "",
           "description": "Your name on comments. Empty: git user.name, else your account name."
-        },
-        "latexReview.livePreview.default": {
-          "type": "boolean",
-          "default": false,
-          "description": "Open LaTeX documents in live preview."
-        },
-        "latexReview.livePreview.reveal": {
-          "type": "string",
-          "default": "never",
-          "enum": [
-            "element",
-            "line",
-            "never"
-          ],
-          "enumDescriptions": [
-            "Show the code of the command the cursor is inside, as Obsidian does.",
-            "Show the code of the whole line the cursor is on.",
-            "Keep code hidden even under the cursor, as in Word: arguments are typed with the code out of sight."
-          ],
-          "description": "When live preview shows the LaTeX code under the cursor."
-        },
-        "latexReview.livePreview.foldCode": {
-          "type": "boolean",
-          "default": true,
-          "description": "In live preview, fold away lines that hold only LaTeX code (labels, \\begin{itemize}, comments, the preamble). The line under the cursor is always shown."
-        },
-        "latexReview.livePreview.protectPreamble": {
-          "type": "boolean",
-          "default": true,
-          "description": "In live preview, keep the preamble and anything after \\end{document} read-only (edits there are undone at once). Switch to Source to edit them."
         },
         "latexReview.zotero.autoBibliography": {
           "type": "boolean",
@@ -556,42 +492,6 @@
           "light": "#f5c51840",
           "dark": "#f5c51830",
           "highContrast": "#00000000"
-        }
-      },
-      {
-        "id": "latexReview.previewMuted",
-        "description": "LaTeX that live preview keeps visible but dims, such as comments and labels.",
-        "defaults": {
-          "light": "#8a8a8a",
-          "dark": "#7f7f7f",
-          "highContrast": "#aaaaaa"
-        }
-      },
-      {
-        "id": "latexReview.previewHeading",
-        "description": "Section headings in live preview.",
-        "defaults": {
-          "light": "#1a56c9",
-          "dark": "#7fb2ff",
-          "highContrast": "#ffffff"
-        }
-      },
-      {
-        "id": "latexReview.previewMath",
-        "description": "Math in live preview.",
-        "defaults": {
-          "light": "#7b3fa0",
-          "dark": "#d2a8ff",
-          "highContrast": "#ffffff"
-        }
-      },
-      {
-        "id": "latexReview.previewReference",
-        "description": "Citations and cross-references in live preview.",
-        "defaults": {
-          "light": "#0b7a75",
-          "dark": "#56d4c8",
-          "highContrast": "#ffffff"
         }
       }
     ]

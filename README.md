@@ -1,9 +1,9 @@
-# LaTeX Review and Live Preview
+# LaTeX Review and Visual Editor
 
 Two things LaTeX in VS Code is missing, in one extension:
 
 1. **Review mode**: track changes as in Word, accept or reject each change, and comment on the text.
-2. **Live preview**: an Obsidian-style mode in the normal editor where LaTeX code is hidden and the text stays editable. Switch between it and the source with one click.
+2. **Visual editor**: the document drawn like the PDF in a tab beside the source, and edited there.
 
 Your `.tex` file always stays plain LaTeX. It builds with LaTeX Workshop as before, and SyncTeX keeps working.
 
@@ -23,40 +23,20 @@ Click **Track changes** in the status bar (or run *LaTeX Review: Start Tracking 
 
 The review is kept beside the document in `.latex-review/<name>.tex.json`: the text changes are measured against, and the comments. It is written when you save the document, so the two always match. Commit it to share a review through git, or add `.latex-review/` to `.gitignore` to keep it private.
 
-## Live preview
-
-Click **Source** in the status bar, the eye button in the editor title, or press `Ctrl+Alt+P` (`Cmd+Alt+P`).
-
-| You write | You see |
-|---|---|
-| `\textbf{x}`, `\emph{x}`, `\underline{x}` | **x**, *x*, x underlined |
-| `\section{Intro}` | **Intro** as a heading |
-| `\cite{a,b,c}`, `\ref{fig:x}`, `\cref{fig:x}` | [1–3], 2, fig. 2 (numbers from the last build's .aux) |
-| `$\alpha \to \beta^2$`, `\frac{a}{b}` | α → β², a/b |
-| `\ce{SO4^2-}`, `\SI{5}{\milli\gram\per\milli\litre}` | SO₄²⁻, 5 mg/mL |
-| `\item`, `` ``q'' ``, `--`, `~`, `\%` | •, “q”, –, non-breaking space, % |
-| `\begin{figure}`, `\end{itemize}` | shown as they are, dimmed |
-| `\footnote{…}`, `\label{key}` | [ … ] dimmed, 🏷 key |
-| `\includegraphics{s}`, `\caption{…}` | 🖼 s, Caption: … |
-
-Lines that hold only code (`\label`, `\begin{itemize}`, `\centering`, comments, the preamble) are folded away; the line the cursor is on always stays open. Turn this off with `latexReview.livePreview.foldCode`.
-
-The preamble and anything after `\end{document}` are read-only in live preview (`latexReview.livePreview.protectPreamble`); switch to Source to edit them.
-
-Code stays hidden while you type, as in Word: a click next to a command puts the cursor inside its braces, so you type its argument (a caption, a label) at once. The cursor steps over hidden code in one go, and typing or deleting cannot cut into it. Set `latexReview.livePreview.reveal` to `element` to see the code of the command the cursor is in, as in Obsidian, or to `line`. `latexReview.livePreview.reveal` switches this to the whole line, or off. The preamble and commands it does not know are left as source. Display math is coloured and its symbols replaced, but it is not typeset.
-
 ## Visual editor
 
-**LaTeX Review: Open Visual Editor** (Cmd+Alt+V, or the book button in the editor title bar) opens the document in a tab beside the source, drawn like the PDF, where you edit it directly:
+**LaTeX Review: Open Visual Editor** (Cmd+Alt+V, or the eye button in the editor title bar) opens the document in a tab beside the source, drawn like the PDF, where you edit it directly:
 
-- Paragraphs and headings are typed like in a word processor. Enter starts a new paragraph, Backspace at the start of one joins it to the one before, Cmd+B and Cmd+I make bold and italic.
+- Paragraphs and headings are typed like in a word processor. Enter starts a new paragraph, Backspace at the start of one joins it to the one before, Cmd+B, Cmd+I and Cmd+U make bold, italic and underlined text (`\textbf`, `\textit`, `\underline` in the source).
 - Equations are drawn with KaTeX (with mhchem's `\ce`); click one to edit its source with a live preview.
 - `\cite`, `\ref` and compound labels show their numbers from the last build (the `.aux`). Click one, or any other command shown in purple, to edit its source.
 - Figures show their picture (`\includegraphics`, or the PDF beside an `\input` drawing), with the caption and the label editable under it; a missing caption or label is added when you type one. Double-click the picture to edit the drawing in Reactio Draw.
 - Tracked changes are shown in blue (added) and red (deleted); click one for Accept or Reject.
 - The preamble, lists and anything else that is not drawn stay as editable source in grey boxes.
 
-Every edit goes straight into the `.tex`; the source and the visual editor scroll to each other.
+Every edit goes straight into the `.tex`; the source and the visual editor scroll to each other, and double-clicking text shows it in the source.
+
+In the `.tex` editor too, Cmd+B, Cmd+I and Cmd+U wrap the selection in `\textbf{}`, `\textit{}` or `\underline{}`, and take it out again.
 
 ## Bibliography from Zotero
 
@@ -67,14 +47,9 @@ Insert citations with any picker (for example Citation Picker for Zotero, set to
 | Setting | Default | |
 |---|---|---|
 | `latexReview.author` | git `user.name` | Your name on comments |
-| `latexReview.livePreview.default` | `false` | Open LaTeX documents in live preview |
-| `latexReview.livePreview.reveal` | `never` | `never`, `element` or `line` |
-| `latexReview.livePreview.foldCode` | `true` | Fold lines that hold only code |
-| `latexReview.livePreview.protectPreamble` | `true` | Preamble read-only in live preview |
 
-Colours (inserted, deleted, comment, heading, math, references) can be changed under `workbench.colorCustomizations`, e.g. `"latexReview.insertedForeground": "#1a56c9"`.
+Colours (inserted, deleted, comment) can be changed under `workbench.colorCustomizations`, e.g. `"latexReview.insertedForeground": "#1a56c9"`.
 
 ## Limits
 
 - A change is any difference from the text tracking started with, measured word by word. Changes have no author, and undoing an *Accept* does not bring the change back.
-- Live preview works by hiding text in the editor, so the cursor still steps over hidden characters one by one, and lines keep the editor's font.
