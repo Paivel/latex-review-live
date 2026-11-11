@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2
+
+- Visual editor: a deleted paragraph (tracked) is shown struck through where it was, with Accept and Reject on click.
+- Visual editor: Cmd+B, Cmd+I and Cmd+U now reach the page instead of moving VS Code's side bar and panels.
+
 ## 0.3.1
 
 - Security: in a folder VS Code does not trust (Restricted Mode), citations are not fetched from Zotero by themselves and PDF figures are not handed to Quick Look or pdftoppm; the page draws them with pdf.js.

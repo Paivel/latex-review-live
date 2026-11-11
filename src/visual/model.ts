@@ -33,7 +33,8 @@ export interface VImage {
 }
 
 export interface VBlock {
-  kind: Block["kind"];
+  /** "deleted": text tracked as deleted where no block is now, such as a whole paragraph. */
+  kind: Block["kind"] | "deleted";
   start: number;
   end: number;
   src: string;
@@ -138,7 +139,9 @@ export function buildDoc(inp: BuildInput): VDoc {
     // An escaped character is one character shown, two in the source.
     return text[n.at] === "\\" && n.s.length === 1 ? 2 : n.s.length;
   };
-  const inline = (start: number, end: number) => markNodes(tokenize(text.slice(start, end), look, start), marks, srcLen, start, end);
+  // Deletions drawn inside a block; the others get a block of their own.
+  const shown = new Set<number>();
+  const inline = (start: number, end: number) => markNodes(tokenize(text.slice(start, end), look, start), marks, srcLen, start, end, shown);
   const out: VBlock[] = blocks.map((b) => {
     const vb: VBlock = { kind: b.kind, start: b.start, end: b.end, src: text.slice(b.start, b.end) };
     vb.changed = marks.some((m) => m.curStart <= b.end && (m.curEnd > b.start || (m.curEnd === m.curStart && m.curStart >= b.start)));
@@ -185,6 +188,14 @@ export function buildDoc(inp: BuildInput): VDoc {
       vb.tex = vb.tex.replace(/\\label\{[^}]*\}/g, "").replace(/\\nonumber|\\notag/g, "");
     }
     return vb;
+  });
+  marks.forEach((m, c) => {
+    if (!m.deleted || shown.has(c)) return;
+    const inPreamble = blocks[0]?.kind === "preamble" && m.curStart < blocks[0].end;
+    if (inPreamble) return;
+    let i = out.findIndex((b) => b.start >= m.curStart || b.kind === "tail");
+    if (i < 0) i = out.length;
+    out.splice(i, 0, { kind: "deleted", start: m.curStart, end: m.curStart, src: "", nodes: [{ t: "del", s: m.deleted, c }], changed: true });
   });
   const pre = blocks[0]?.kind === "preamble" ? text.slice(blocks[0].start, blocks[0].end) : "";
   const natbib = /\\usepackage\s*\[([^\]]*)\]\s*\{natbib\}/.exec(pre.replace(/(^|[^\\])%.*$/gm, "$1"));

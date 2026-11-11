@@ -218,6 +218,13 @@ function renderBlock(b: VBlock): HTMLElement {
       }
       break;
     }
+    case "deleted": {
+      // A deleted paragraph: shown struck through, Accept or Reject on click.
+      const p = el("p");
+      renderNodes(p, b.nodes ?? [], b.start);
+      box.appendChild(p);
+      break;
+    }
     case "tail":
       box.hidden = true;
       break;

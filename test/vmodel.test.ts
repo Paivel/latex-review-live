@@ -23,3 +23,18 @@ describe("visual model", () => {
     expect(flat(p.nodes!)).toBe("Hello [+brave ]world <[-very ]bold> 50%[- gone] end.");
   });
 });
+
+describe("deleted paragraphs", () => {
+  it("get a block of their own between the paragraphs", () => {
+    const t = "\\begin{document}\nfirst\n\n\n\nsecond\n\\end{document}\n";
+    const gap = t.indexOf("\n\n\n") + 2;
+    const d = buildDoc({ text: t, uri: "u", version: 1, name: "m", look: {}, tracking: true, images: () => [], marks: [{ curStart: gap, curEnd: gap, deleted: "asa" }] });
+    expect(d.blocks.map((b) => b.kind)).toEqual(["preamble", "para", "deleted", "para", "tail"]);
+    expect(d.blocks[2].nodes).toEqual([{ t: "del", s: "asa", c: 0 }]);
+  });
+  it("are not drawn twice when a paragraph shows them", () => {
+    const t = "\\begin{document}\nfirst word\n\\end{document}\n";
+    const d = buildDoc({ text: t, uri: "u", version: 1, name: "m", look: {}, tracking: true, images: () => [], marks: [{ curStart: t.indexOf(" word"), curEnd: t.indexOf(" word"), deleted: " big" }] });
+    expect(d.blocks.some((b) => b.kind === "deleted")).toBe(false);
+  });
+});
