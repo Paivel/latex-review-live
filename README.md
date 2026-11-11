@@ -27,7 +27,7 @@ The review is kept beside the document in `.latex-review/<name>.tex.json`: the t
 
 **LaTeX Review: Open Visual Editor** (Cmd+Alt+V, or the eye button in the editor title bar) opens the document in a tab beside the source, drawn like the PDF, where you edit it directly:
 
-- Paragraphs and headings are typed like in a word processor. Enter starts a new paragraph, Backspace at the start of one joins it to the one before, Cmd+B, Cmd+I and Cmd+U make bold, italic and underlined text (`\textbf`, `\textit`, `\underline` in the source).
+- Paragraphs and headings are typed like in a word processor. Enter starts a new paragraph, Backspace at the start of one joins it to the one before, Cmd+B, Cmd+I and Cmd+U make bold, italic and underlined text; a LaTeX command typed in full (`\\rcmpd{1}`, `\\cite{key}`) or `$..$` math stays LaTeX (`\textbf`, `\textit`, `\underline` in the source).
 - Equations are drawn with KaTeX (with mhchem's `\ce`); click one to edit its source with a live preview.
 - `\cite`, `\ref` and compound labels show their numbers from the last build (the `.aux`). Click one, or any other command shown in purple, to edit its source.
 - Figures show their picture (`\includegraphics`, or the PDF beside an `\input` drawing), with the caption and the label editable under it; a missing caption or label is added when you type one. Double-click the picture to edit the drawing in Reactio Draw.

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.4
+
+- Visual editor: formulas use the macros the preamble defines (\newcommand, \renewcommand, \providecommand, \DeclareMathOperator, \def); drawn formulas are cached, so long documents redraw fast.
+- Visual editor: \ce{..} and \pu{..} in running text are drawn with mhchem.
+- Visual editor: a whole LaTeX command typed or pasted into the text (\rcmpd{1}, \cite{key}, \ce{H2O}) and $..$ math stay LaTeX instead of being escaped.
+- Visual editor: compound labels on Reactio pictures can be clicked: copy their \rcmpd{..}, or insert it at the caret.
+
 ## 0.3.3
 
 - Visual editor: a deleted paragraph and the paragraph after it keep their first-line indent.

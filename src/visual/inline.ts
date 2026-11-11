@@ -141,6 +141,15 @@ export function tokenize(s: string, look: Lookup = {}, base = 0): Inline[] {
         i = a.end;
         continue;
       }
+      if ((name === "ce" || name === "pu") && s[j] === "{") {
+        // mhchem in text: drawn by KaTeX's mhchem like in math.
+        const e = groupEnd(s, j);
+        if (e > 0) {
+          atom({ t: "atom", src: s.slice(i, e), kind: "math", tex: `\\${name}{${s.slice(j + 1, e - 1)}}` });
+          i = e;
+          continue;
+        }
+      }
       if (CMPD.test(name)) {
         const a = args(s, j, 1);
         const key = (a.braces[0] ?? "").trim();

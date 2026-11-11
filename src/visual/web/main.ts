@@ -26,13 +26,28 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
   return e;
 }
 
+// Drawn formulas by source, for the macros they were drawn with: a long document draws each one once.
+const mathCache = new Map<string, string | null>();
+let mathMacros = "";
 function renderMath(tex: string, target: HTMLElement, display: boolean) {
-  try {
-    katex.render(tex, target, { displayMode: display, throwOnError: false, strict: "ignore", trust: false });
-  } catch {
-    target.textContent = tex;
-    target.classList.add("raw");
+  const macros = JSON.stringify(doc?.macros ?? {});
+  if (macros !== mathMacros) { mathCache.clear(); mathMacros = macros; }
+  const key = `${display ? 1 : 0}\u0000${tex}`;
+  let html = mathCache.get(key);
+  if (html === undefined) {
+    try {
+      // KaTeX writes \gdef into the table it is given: each formula gets its own copy.
+      html = katex.renderToString(tex, { displayMode: display, throwOnError: false, strict: "ignore", trust: false, macros: { ...(doc?.macros ?? {}) } });
+    } catch {
+      html = null;
+    }
+    if (mathCache.size > 2000) mathCache.delete(mathCache.keys().next().value!);
+    mathCache.set(key, html);
   }
+  target.classList.toggle("raw", html === null);
+  // KaTeX's own markup (trust: false), not document text.
+  if (html === null) target.textContent = tex;
+  else target.innerHTML = html;
 }
 
 function renderNodes(parent: HTMLElement, nodes: MNode[], base: number) {
@@ -156,6 +171,14 @@ function renderBlock(b: VBlock): HTMLElement {
             t.style.fontSize = em(l.size);
             renderNodes(t, l.nodes ?? [], 0);
             t.querySelectorAll(".atom").forEach((a) => { (a as HTMLElement).style.pointerEvents = "none"; });
+            const refs = [...l.tex.matchAll(/\\(?:r?cmpd|refcmpd|cmpdplain)\*?(?:\[[^\]]*\])*\{[^{}]*\}/g)].map((x) => x[0]);
+            if (refs.length) {
+              t.classList.add("ref");
+              t.title = `${refs.join(", ")}: click to copy or insert into the text`;
+              t.addEventListener("mousedown", (e) => e.preventDefault()); // keep the caret in the text
+              t.addEventListener("dblclick", (e) => e.stopPropagation());
+              t.addEventListener("click", (e) => { e.stopPropagation(); labelPop(t, refs); });
+            }
             pic.appendChild(t);
           }
         }
@@ -443,7 +466,7 @@ function serialize(node: Node, keepMark = false): string {
   node.childNodes.forEach((c) => {
     if (c.nodeType === 3) {
       const v = c.nodeValue ?? "";
-      out += keepMark ? v.split(MARK).map((x) => escapeText(x)).join(MARK) : escapeText(v);
+      out += typedText(v, keepMark);
       return;
     }
     if (c.nodeType !== 1) return;
@@ -460,6 +483,22 @@ function serialize(node: Node, keepMark = false): string {
     else out += inner;
   });
   return out;
+}
+
+/**
+ * Typed text as LaTeX. A whole command typed or pasted in (\\rcmpd{1},
+ * \\cite{key}, \\ce{H2O}) and $..$ math stay LaTeX; everything else is
+ * escaped, so a lone \\ or % is text.
+ */
+const TYPED_LATEX = /\\[a-zA-Z@]+\*?(?:\[[^\]\n]*\])*(?:\{(?:[^{}\n]|\{[^{}\n]*\})*\})+|\$[^$\s](?:[^$\n]*[^$\s])?\$/g;
+function typedText(v: string, keepMark: boolean): string {
+  const esc = (x: string) => (keepMark ? x.split(MARK).map((y) => escapeText(y)).join(MARK) : escapeText(x));
+  let out = "", last = 0;
+  for (const m of v.matchAll(TYPED_LATEX)) {
+    out += esc(v.slice(last, m.index)) + m[0];
+    last = m.index! + m[0].length;
+  }
+  return out + esc(v.slice(last));
 }
 
 function regionText(r: HTMLElement): string {
@@ -760,6 +799,61 @@ function editAtom(a: HTMLElement) {
     if (e.key === "Escape") { e.preventDefault(); closePop(); }
   });
   t.addEventListener("blur", () => setTimeout(() => { if (pop && !pop.contains(document.activeElement)) apply(); }, 0));
+}
+
+// Where the caret last was in a text region: a label from a picture goes there.
+let lastCaret: Range | null = null;
+document.addEventListener("selectionchange", () => {
+  const sel = getSelection();
+  if (!sel?.rangeCount) return;
+  const r = sel.getRangeAt(0);
+  const host = (r.startContainer.nodeType === 1 ? (r.startContainer as HTMLElement) : r.startContainer.parentElement)?.closest<HTMLElement>(".region");
+  if (host && host.dataset.region !== "code" && !host.dataset.field) lastCaret = r.cloneRange();
+});
+
+function copyText(v: string) {
+  void navigator.clipboard?.writeText(v).catch(() => {
+    const t = el("textarea");
+    t.value = v;
+    document.body.appendChild(t);
+    t.select();
+    document.execCommand("copy");
+    t.remove();
+  });
+}
+
+/** A compound label on a picture: copy its LaTeX, or put it at the caret. */
+function labelPop(target: HTMLElement, refs: string[]) {
+  closePop();
+  pop = el("div", "pop labels");
+  for (const ref of refs) {
+    const row = el("div", "lrow");
+    row.appendChild(el("code", "", ref));
+    const copy = el("button", "plain", "Copy");
+    copy.addEventListener("click", () => { copyText(ref); copy.textContent = "Copied"; setTimeout(closePop, 600); });
+    const ins = el("button", "ok", "Insert");
+    ins.disabled = !lastCaret || !lastCaret.startContainer.isConnected;
+    ins.title = ins.disabled ? "Click in the text first" : "Insert at the caret";
+    ins.addEventListener("click", () => {
+      const range = lastCaret;
+      closePop();
+      if (!range || !range.startContainer.isConnected) return;
+      const region = (range.startContainer.nodeType === 1 ? (range.startContainer as HTMLElement) : range.startContainer.parentElement)!.closest<HTMLElement>(".region")!;
+      region.focus();
+      const sel = getSelection()!;
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand("insertText", false, ref);
+      clearTimeout(timers.get(region));
+      flush(region);
+    });
+    row.append(copy, ins);
+    pop.appendChild(row);
+  }
+  document.body.appendChild(pop);
+  const rect = target.getBoundingClientRect();
+  pop.style.left = `${Math.max(8, Math.min(rect.left + scrollX, innerWidth - 300))}px`;
+  pop.style.top = `${rect.bottom + scrollY + 4}px`;
 }
 
 function showDecide(target: HTMLElement) {

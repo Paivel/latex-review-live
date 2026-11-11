@@ -1,6 +1,7 @@
 // What the extension sends to the visual editor page. Pure, so it can be tested.
 import { Block, MATH_ENVS, headingNumbers, splitBlocks } from "./blocks";
 import { Inline, Lookup, tokenize } from "./inline";
+import { preambleMacros } from "./macros";
 
 /** Inline nodes plus track-changes marks. */
 export type MNode =
@@ -68,6 +69,8 @@ export interface VDoc {
   superCites: boolean;
   /** Body font size of the document in pt (10, 11 or 12). */
   fontPt: number;
+  /** The preamble's own commands, for KaTeX. */
+  macros: Record<string, string>;
   tracking: boolean;
   changes: Mark[];
   blocks: VBlock[];
@@ -210,6 +213,8 @@ export function buildDoc(inp: BuildInput): VDoc {
     name: inp.name,
     superCites: !!(natbib && /\bsuper\b/.test(natbib[1])) || achemso,
     fontPt,
+    // mhchem's \ce is KaTeX's own; a preamble stand-in for it would hide it.
+    macros: Object.fromEntries(Object.entries(preambleMacros(pre)).filter(([k]) => k !== "\\ce" && k !== "\\pu")),
     tracking: inp.tracking,
     changes: marks,
     blocks: out,
