@@ -36,3 +36,13 @@ describe("inline", () => {
     expect(serialize([{ t: "text", s: "50% & {x} \\ ^ ~ a b", at: 0 }])).toBe(String.raw`50\% \& \{x\} \textbackslash{} \^{} \textasciitilde{} a b`);
   });
 });
+
+describe("TeX ligatures", () => {
+  it("shows dashes and quotes, keeps the source", async () => {
+    const { tokenize, serialize } = await import("../src/visual/inline");
+    const s = "C--H, 1---2 and ``quoted''";
+    const t = tokenize(s);
+    expect(serialize(t)).toBe(s);
+    expect(t.filter((n) => n.t === "atom").map((n) => (n as { show?: string }).show)).toEqual(["–", "—", "“", "”"]);
+  });
+});

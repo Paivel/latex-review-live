@@ -2,6 +2,7 @@
 
 ## 0.4.1
 
+- Visual editor: closer to the article class in the PDF: a regular-weight title, author and date at \large, a smaller abstract, no blank gap between paragraphs, and -- / --- / `` '' drawn as dashes and curly quotes (the source keeps them as typed).
 - Track changes: a deleted piece stays where it was. Changes are now updated from each edit instead of re-diffing the whole file, which could show the deletion next to an earlier blank line or repeated word.
 
 ## 0.4.0

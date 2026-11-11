@@ -24,6 +24,7 @@ const CITE = /^(?:[a-zA-Z]*cite[a-zA-Z]*|nocite)$/;
 const REF = /^(?:ref|eqref|cref|Cref|autoref|pageref|vref|nameref)$/;
 const CMPD = /^(?:cmpd|rcmpd|refcmpd|cmpdplain)$/;
 const ESCAPABLE = "%&_#${}";
+const LIGATURES: Record<string, string> = { "---": "\u2014", "--": "\u2013", "``": "\u201c", "''": "\u201d" };
 
 export interface Lookup {
   cites?: Map<string, string>;
@@ -194,6 +195,9 @@ export function tokenize(s: string, look: Lookup = {}, base = 0): Inline[] {
       continue;
     }
     if (c === "~") { atom({ t: "atom", src: "~", kind: "space", show: " " }); i++; continue; }
+    // TeX ligatures: dashes and curly quotes look as in the PDF; the source keeps its hyphens.
+    const lig = s.startsWith("---", i) ? "---" : s.startsWith("--", i) ? "--" : s.startsWith("``", i) ? "``" : s.startsWith("''", i) ? "''" : "";
+    if (lig) { atom({ t: "atom", src: lig, kind: "space", show: LIGATURES[lig] }); i += lig.length; continue; }
     if (c === "{") {
       const e = groupEnd(s, i);
       if (e > 0) { atom({ t: "atom", src: s.slice(i, e), kind: "cmd", show: s.slice(i, e) }); i = e; continue; }
