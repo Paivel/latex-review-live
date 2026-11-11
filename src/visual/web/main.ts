@@ -1,6 +1,6 @@
 // The visual editor page. Runs in the webview.
 import { escapeText } from "../inline";
-import type { MNode, VBlock, VDoc } from "../model";
+import type { MNode, VBlock, VDoc, VList, VText } from "../model";
 
 declare const acquireVsCodeApi: () => { postMessage(m: unknown): void };
 declare const katex: { render(tex: string, el: HTMLElement, opts: object): void; renderToString(tex: string, opts: object): string };
@@ -151,7 +151,8 @@ function renderBlock(b: VBlock): HTMLElement {
         const pic = el("div", "pic");
         // As LaTeX sets it: natural size (1:1), never wider than the line.
         const em = (pt: number) => `${pt / (doc?.fontPt ?? 10)}em`;
-        if (im.widthPt) pic.style.width = em(im.widthPt);
+        if (im.widthFrac) pic.style.width = `${Math.min(1, im.widthFrac) * 100}%`;
+        else if (im.widthPt) pic.style.width = em(im.widthPt);
         pic.title = "Double-click to edit the drawing";
         pic.addEventListener("dblclick", (e) => { e.preventDefault(); vscode.postMessage({ type: "editFigure", file: im.file, entry: im.entry }); });
         pics.appendChild(pic);
@@ -218,13 +219,19 @@ function renderBlock(b: VBlock): HTMLElement {
       break;
     }
     case "list":
+      if (b.list) { box.appendChild(renderList(b.list, b)); break; }
+    // falls through: a list it could not read stays source
     case "code": {
+      if (b.envbox) { renderEnvBox(box, b); break; }
+      if (b.titleBlock) renderTitle(box, b);
+      if (b.inputs) renderInputs(box, b);
       const pre = el("pre", "code");
       pre.textContent = b.src;
       editable(pre, b.start, b.end, b.src, "code");
       pre.contentEditable = "plaintext-only";
       pre.spellcheck = false;
       box.appendChild(pre);
+      if (b.hideSource) sourceToggle(box, pre);
       if (b.bib?.length) {
         // Only \bibliographystyle / \bibliography lines: the list stands for them, as in the PDF. Click the heading for the source.
         const onlyBib = b.src.split("\n").every((l) => /^\s*(?:\\bibliographystyle\{[^}]*\}|\\bibliography\{[^}]*\}|\\printbibliography(?:\[[^\]]*\])?|%.*)?\s*$/.test(l));
@@ -262,6 +269,82 @@ function renderBlock(b: VBlock): HTMLElement {
       break;
   }
   return box;
+}
+
+/** An editable piece of text drawn from its nodes. */
+function textRegion(tag: "span" | "div" | "h1", cls: string, t: VText, b: VBlock): HTMLElement {
+  const e = el(tag as "span", cls);
+  renderNodes(e, t.nodes, b.start);
+  editable(e, t.start, t.end, t.src ?? sliceOf(b, t.start, t.end), "inline");
+  return e;
+}
+
+function renderList(l: VList, b: VBlock): HTMLElement {
+  const list = el(l.env === "enumerate" ? "ol" : l.env === "description" ? "dl" : "ul", `vlist ${l.env}`) as HTMLElement;
+  for (const it of l.items) {
+    const li = el(l.env === "description" ? "div" : "li", "vitem");
+    if (it.label) {
+      const lab = textRegion("span", "itemlabel", it.label, b);
+      li.appendChild(lab);
+      li.appendChild(document.createTextNode(" "));
+    }
+    const t = textRegion("span", "itemtext", it.text, b);
+    t.dataset.item = "1";
+    li.appendChild(t);
+    for (const sub of it.sub) li.appendChild(renderList(sub, b));
+    list.appendChild(li);
+  }
+  return list;
+}
+
+function renderEnvBox(box: HTMLElement, b: VBlock) {
+  const e = b.envbox!;
+  const abstract = e.title === "Abstract";
+  box.classList.add("envbox", e.title.toLowerCase());
+  const head = el("span", "envtitle", e.num ? `${e.title} ${e.num}` : e.title);
+  head.contentEditable = "false";
+  const body = el("div", "envbody");
+  // "Theorem 2 (note). text" in one run; the abstract has its title above.
+  if (abstract) box.appendChild(head);
+  else body.appendChild(head);
+  if (e.note) {
+    body.appendChild(document.createTextNode(" ("));
+    body.appendChild(textRegion("span", "envnote", e.note, b));
+    body.appendChild(document.createTextNode(")"));
+  }
+  if (!abstract) body.appendChild(document.createTextNode(". "));
+  body.appendChild(textRegion("span", "envinner", e.inner, b));
+  if (e.title === "Proof") body.appendChild(el("span", "qed", " ∎"));
+  box.appendChild(body);
+}
+
+function renderTitle(box: HTMLElement, b: VBlock) {
+  const t = b.titleBlock!;
+  const tb = el("div", "titleblock");
+  if (t.title) tb.appendChild(textRegion("div", "doctitle", t.title, b));
+  if (t.author) tb.appendChild(textRegion("div", "docauthor", t.author, b));
+  if (t.date) tb.appendChild(textRegion("div", "docdate", t.date, b));
+  box.appendChild(tb);
+}
+
+function renderInputs(box: HTMLElement, b: VBlock) {
+  const row = el("div", "inputs");
+  for (const x of b.inputs!) {
+    const chip = el("span", x.file ? "chip" : "chip missing", `📄 ${x.path}`);
+    chip.title = x.file ? "Click to open" : "File not found";
+    if (x.file) chip.addEventListener("click", () => vscode.postMessage({ type: "openInput", file: x.file }));
+    row.appendChild(chip);
+  }
+  box.appendChild(row);
+}
+
+/** A block whose drawing stands for its source: the source opens from a small button. */
+function sourceToggle(box: HTMLElement, pre: HTMLElement) {
+  pre.hidden = true;
+  const btn = el("button", "srctoggle", "LaTeX");
+  btn.title = "Show or hide the LaTeX";
+  btn.addEventListener("click", (e) => { e.stopPropagation(); pre.hidden = !pre.hidden; });
+  box.appendChild(btn);
 }
 
 function sliceOf(b: VBlock, start: number, end: number): string {
@@ -518,6 +601,8 @@ const timers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
 
 function flush(r: HTMLElement): string | null {
   clearTimeout(timers.get(r));
+  // Already sent as a whole (a new \item): it is redrawn from the source.
+  if (r.dataset.frozen) return null;
   if (r.dataset.field) {
     const value = serialize(r).trim();
     if (value) vscode.postMessage({ type: "field", fig: Number(r.dataset.fig), which: r.dataset.field, value });
@@ -558,8 +643,14 @@ function flush(r: HTMLElement): string | null {
   r.dataset.end = String(start + text.length);
   const box = r.closest<HTMLElement>(".block")!;
   const bs = Number(box.dataset.start);
-  box.dataset.bsrc = (box.dataset.bsrc ?? "").slice(0, start - bs) + text + (box.dataset.bsrc ?? "").slice(end - bs);
-  box.dataset.end = String(Number(box.dataset.end) + delta);
+  if (start >= bs) {
+    box.dataset.bsrc = (box.dataset.bsrc ?? "").slice(0, start - bs) + text + (box.dataset.bsrc ?? "").slice(end - bs);
+    box.dataset.end = String(Number(box.dataset.end) + delta);
+  } else {
+    // Text shown here but written before the block (the title, in the preamble): the block itself moves.
+    box.dataset.start = String(bs + delta);
+    box.dataset.end = String(Number(box.dataset.end) + delta);
+  }
   // Everything after the edit moves.
   for (const o of page.querySelectorAll<HTMLElement>("[data-start]")) {
     if (o === r || o === box) continue;
@@ -607,6 +698,25 @@ page.addEventListener("keydown", (ev) => {
   const box = r.closest<HTMLElement>(".block")!;
   if (ev.key === "Enter" && !ev.shiftKey) {
     ev.preventDefault();
+    if (r.dataset.item) {
+      // A new \item at the caret, indented like this one.
+      document.execCommand("insertText", false, MARK);
+      const withMark = serialize(r, true);
+      const at = withMark.indexOf(MARK);
+      clearTimeout(timers.get(r));
+      const bsrc = box.dataset.bsrc ?? "";
+      const before = bsrc.slice(0, Number(r.dataset.start) - Number(box.dataset.start));
+      const line = before.slice(before.lastIndexOf("\n") + 1);
+      const indent = /^[ \t]*/.exec(line)![0];
+      const ins = `\n${indent}\\item `;
+      const text = withMark.replace(MARK, ins);
+      const start = Number(r.dataset.start);
+      vscode.postMessage({ type: "edit", start, end: Number(r.dataset.end), old: r.dataset.src ?? "", text });
+      r.dataset.src = text;
+      r.dataset.frozen = "1";
+      pendingFocus = start + at + ins.length;
+      return;
+    }
     if (!box.classList.contains("para")) { r.blur(); return; }
     if (caretAtEnd(r)) {
       // Nothing after the caret: an empty paragraph that reaches the source once something is typed.
@@ -928,6 +1038,12 @@ window.addEventListener("message", (e) => {
   if (m.type === "pictures") for (const [k, v] of Object.entries(m.items as Record<string, string>)) pictureData.set(k, v);
   if (m.type === "doc") render(m.doc, !!m.refresh);
   if (m.type === "format") format(m.cmd);
+  if (m.type === "undo") {
+    // Send what is typed but not sent, so the source's history has it, then step it back.
+    for (const r of page.querySelectorAll<HTMLElement>(".region")) if (!r.dataset.field && regionText(r) !== (r.dataset.src ?? "")) flush(r);
+    page.querySelectorAll<HTMLTextAreaElement>("textarea.eqsrc").forEach((t) => flushMath(t));
+    vscode.postMessage({ type: "undo", redo: !!m.redo });
+  }
   if (m.type === "cursor") {
     if (document.hasFocus() && page.contains(document.activeElement)) return;
     for (const box of page.querySelectorAll<HTMLElement>(":scope > .block")) {

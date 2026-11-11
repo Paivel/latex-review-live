@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+- Visual editor: lists (itemize, enumerate, description) are drawn as lists, nested too; each item is edited in place, and Enter at an item starts a new \item.
+- Visual editor: \maketitle shows the title, authors and date from the preamble, editable; the abstract is drawn as an abstract.
+- Visual editor: theorem-like environments (theorem, lemma, definition…, and your own \newtheorem) and proofs are drawn with their title and number.
+- Visual editor: \includegraphics[width=0.5\linewidth] (or a width in cm/pt, or scale=) sets the picture's size as in the PDF.
+- Visual editor: \cref, \Cref and \autoref show the kind as LaTeX prints it ("fig. 1", "Figure 1", "Equation (2)").
+- Visual editor: \input and \include lines show as chips; click one to open the file.
+- Visual editor: Cmd+Z and Cmd+Shift+Z undo and redo through the .tex file's own history, shared with the text editor.
+
 ## 0.3.7
 
 - Visual editor: after clicking an equation and leaving it unchanged, it is drawn as before (with the document's number), and no scroll bar is left under it.

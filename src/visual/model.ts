@@ -2,6 +2,7 @@
 import { Block, MATH_ENVS, headingNumbers, splitBlocks } from "./blocks";
 import { Inline, Lookup, tokenize } from "./inline";
 import { preambleMacros } from "./macros";
+import { ListInfo, commandArg, envBox, inputPaths, onlyCommands, parseList, theoremEnvs } from "./structure";
 
 /** Inline nodes plus track-changes marks. */
 export type MNode =
@@ -23,6 +24,8 @@ export interface VImage {
   pdf: boolean;
   /** The picture is still being drawn. */
   pending?: boolean;
+  /** Share of the line the picture takes (width=0.6\\linewidth). */
+  widthFrac?: number;
   /** Natural size of the picture in pt (PDF MediaBox), shown at that size like \\includegraphics without a width. */
   widthPt?: number;
   heightPt?: number;
@@ -58,8 +61,26 @@ export interface VBlock {
   tex?: string;
   /** code block with \\bibliography: the reference list from the last build. */
   bib?: { label: string; nodes: MNode[] }[];
+  /** list: its items. */
+  list?: VList;
+  /** code block with \maketitle: the title, authors and date from the preamble. */
+  titleBlock?: { title: VText | null; author: VText | null; date: VText | null };
+  /** theorem-like environment, proof or abstract. */
+  envbox?: { title: string; num?: string; note: VText | null; inner: VText };
+  /** code block of \input / \include lines: the files, found or not. */
+  inputs?: { path: string; file?: string }[];
+  /** The block's own source is not shown: what is drawn stands for it. */
+  hideSource?: boolean;
   /** Whether a tracked change touches the block. */
   changed?: boolean;
+}
+
+/** An editable piece of text: its source range and how it is drawn. */
+export interface VText { start: number; end: number; nodes: MNode[]; src?: string }
+
+export interface VList {
+  env: string;
+  items: { text: VText; label: VText | null; sub: VList[] }[];
 }
 
 export interface VDoc {
@@ -126,6 +147,8 @@ export interface BuildInput {
   marks: Mark[];
   /** Entries of the last build's .bbl. */
   bbl?: { key: string; label: string; tex: string }[];
+  /** The file an \input / \include names, if it exists. */
+  inputFile?: (path: string) => string | undefined;
   /** Picture resolver for a figure's graphic. */
   images: (fig: NonNullable<Block["figure"]>) => VImage[];
 }
@@ -144,12 +167,57 @@ export function buildDoc(inp: BuildInput): VDoc {
   };
   // Deletions drawn inside a block; the others get a block of their own.
   const shown = new Set<number>();
-  const inline = (start: number, end: number) => markNodes(tokenize(text.slice(start, end), look, start), marks, srcLen, start, end, shown);
+  const pre = blocks[0]?.kind === "preamble" ? text.slice(blocks[0].start, blocks[0].end) : "";
+  const theorems = theoremEnvs(pre);
+  // What each label names, for \cref and \autoref.
+  const kinds = new Map<string, string>(look.kinds ?? []);
+  const HEAD = ["part", "chapter", "section", "subsection", "subsubsection", "paragraph", "subparagraph"];
+  for (const b of blocks) {
+    const src = text.slice(b.start, b.end);
+    let kind: string | undefined;
+    if (b.kind === "figure" && b.figure) kind = b.figure.env.replace("*", "");
+    else if (b.kind === "math") kind = "equation";
+    else if (b.kind === "heading") kind = HEAD[b.level ?? 2];
+    else if (b.kind === "code" && b.env) kind = theorems.get(b.env)?.title.toLowerCase();
+    if (!kind) continue;
+    for (const m of src.matchAll(/\\label\{([^}]*)\}/g)) if (!kinds.has(m[1])) kinds.set(m[1], kind);
+  }
+  const lk = { ...look, kinds };
+  const inline = (start: number, end: number) => markNodes(tokenize(text.slice(start, end), lk, start), marks, srcLen, start, end, shown);
+  const vtext = (r: { start: number; end: number } | null): VText | null => (r ? { start: r.start, end: r.end, nodes: inline(r.start, r.end), src: text.slice(r.start, r.end) } : null);
+  const vlist = (l: ListInfo): VList => ({ env: l.env, items: l.items.map((it) => ({ text: vtext(it.text)!, label: vtext(it.label), sub: it.sub.map(vlist) })) });
+  const thmCount: Record<string, number> = {};
   const out: VBlock[] = blocks.map((b) => {
     const vb: VBlock = { kind: b.kind, start: b.start, end: b.end, src: text.slice(b.start, b.end) };
     vb.changed = marks.some((m) => m.curStart <= b.end && (m.curEnd > b.start || (m.curEnd === m.curStart && m.curStart >= b.start)));
     if (b.kind === "code" && inp.bbl?.length && /\\(bibliography|printbibliography)\b/.test(vb.src)) {
       vb.bib = inp.bbl.map((e) => ({ label: e.label, nodes: tokenize(e.tex, look) as MNode[] }));
+    }
+    if (b.kind === "list") {
+      const at = b.start + (/^[ \t]*/.exec(vb.src)?.[0].length ?? 0);
+      const l = parseList(text, at);
+      if (l) vb.list = vlist(l);
+    }
+    if (b.kind === "code") {
+      const at = b.start + (/^[ \t]*/.exec(vb.src)?.[0].length ?? 0);
+      const box = b.env ? envBox(text, at, theorems) : null;
+      if (box) {
+        const t = theorems.get(box.env) ?? theorems.get(box.env.replace(/\*$/, ""));
+        let num: string | undefined;
+        if (t?.numbered && !box.env.endsWith("*")) { thmCount[box.env] = (thmCount[box.env] ?? 0) + 1; num = String(thmCount[box.env]); }
+        const lab = /\\label\{([^}]*)\}/.exec(text.slice(box.inner.start, box.inner.end));
+        if (num && lab) num = look.labels?.get(lab[1]) ?? num;
+        vb.envbox = { title: box.title, num, note: vtext(box.note), inner: vtext(box.inner)! };
+      } else if (/\\maketitle\b/.test(vb.src)) {
+        vb.titleBlock = { title: vtext(commandArg(text, "title", 0, b.start)), author: vtext(commandArg(text, "author", 0, b.start)), date: vtext(commandArg(text, "date", 0, b.start)) };
+        vb.hideSource = onlyCommands(vb.src, ["maketitle"]);
+      } else {
+        const paths = inputPaths(vb.src);
+        if (paths.length) {
+          vb.inputs = paths.map((p) => ({ path: p, file: inp.inputFile?.(p) }));
+          vb.hideSource = onlyCommands(vb.src, ["input", "include", "subfile", "subfileinclude", "import", "subimport"]);
+        }
+      }
     }
     if (b.kind === "para") {
       // Leading indentation is kept as plain text so the source keeps it.
@@ -200,7 +268,6 @@ export function buildDoc(inp: BuildInput): VDoc {
     if (i < 0) i = out.length;
     out.splice(i, 0, { kind: "deleted", start: m.curStart, end: m.curStart, src: "", nodes: [{ t: "del", s: m.deleted, c }], changed: true });
   });
-  const pre = blocks[0]?.kind === "preamble" ? text.slice(blocks[0].start, blocks[0].end) : "";
   const natbib = /\\usepackage\s*\[([^\]]*)\]\s*\{natbib\}/.exec(pre.replace(/(^|[^\\])%.*$/gm, "$1"));
   const cls = /\\documentclass\s*(?:\[([^\]]*)\])?\s*\{([^}]*)\}/.exec(pre);
   const achemso = cls?.[2].trim() === "achemso";

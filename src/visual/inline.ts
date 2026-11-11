@@ -28,6 +28,8 @@ const ESCAPABLE = "%&_#${}";
 export interface Lookup {
   cites?: Map<string, string>;
   labels?: Map<string, string>;
+  /** What a label names ("figure", "equation", "section"…), for \cref, \Cref and \autoref. */
+  kinds?: Map<string, string>;
   symbols?: Record<string, string>;
 }
 
@@ -137,7 +139,7 @@ export function tokenize(s: string, look: Lookup = {}, base = 0): Inline[] {
         const a = args(s, j, 1);
         const keys = (a.braces[0] ?? "").split(",").map((k) => k.trim());
         const v = keys.map((k) => look.labels?.get(k) ?? "??").join(", ");
-        atom({ t: "atom", src: s.slice(i, a.end), kind: "ref", show: name === "eqref" ? `(${v})` : v });
+        atom({ t: "atom", src: s.slice(i, a.end), kind: "ref", show: name === "eqref" ? `(${v})` : refText(name, keys, v, look) });
         i = a.end;
         continue;
       }
@@ -226,6 +228,27 @@ export function compress(nums: string[]): string {
 }
 
 /** Escape text the user typed. */
+const PREFIX_KINDS: Record<string, string> = { fig: "figure", tab: "table", eq: "equation", sec: "section", ssec: "subsection", chap: "chapter", sch: "scheme", app: "appendix", thm: "theorem", lem: "lemma", def: "definition" };
+// cleveref's own names: \cref "fig. 1", \Cref "Figure 1"; \autoref is hyperref's "Figure 1".
+const SHORT: Record<string, string> = { figure: "fig.", table: "tab.", equation: "eq.", section: "section", subsection: "section", subsubsection: "section", chapter: "chapter", scheme: "scheme", chart: "chart", appendix: "appendix" };
+const LONG: Record<string, string> = { figure: "Figure", table: "Table", equation: "Equation", section: "Section", subsection: "Section", subsubsection: "Section", chapter: "Chapter", scheme: "Scheme", chart: "Chart", appendix: "Appendix" };
+
+/** The kind of a label: from the document, else from its prefix (fig:, eq:…). */
+export function labelKind(key: string, look: Lookup): string | undefined {
+  return look.kinds?.get(key) ?? PREFIX_KINDS[/^([a-zA-Z]+)[:\-_]/.exec(key)?.[1] ?? ""];
+}
+
+/** What \ref, \cref, \Cref or \autoref prints. */
+function refText(name: string, keys: string[], v: string, look: Lookup): string {
+  if (name !== "cref" && name !== "Cref" && name !== "autoref") return v;
+  const kind = labelKind(keys[0], look);
+  if (!kind) return v;
+  const cap = (w: string) => w[0].toUpperCase() + w.slice(1);
+  const word = name === "cref" ? SHORT[kind] ?? kind : LONG[kind] ?? cap(kind);
+  const num = kind === "equation" && name !== "autoref" ? `(${v})` : v;
+  return `${word} ${num}`;
+}
+
 export function escapeText(s: string): string {
   let r = "";
   for (const c of s) {

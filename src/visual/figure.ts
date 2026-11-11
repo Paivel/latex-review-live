@@ -13,6 +13,21 @@ export interface Graphic {
   /** "graphics" for \includegraphics, "input" for \input / \include. */
   kind: "graphics" | "input";
   path: string;
+  /** \includegraphics[..] options, as written. */
+  options?: string;
+}
+
+/** The size \includegraphics options ask for: a share of the line (width=0.6\linewidth), a width in pt, or a scale. */
+export function graphicSize(options: string | undefined): { frac?: number; pt?: number; scale?: number } {
+  if (!options) return {};
+  const w = /(?:^|,)\s*width\s*=\s*([\d.]*)\s*\\(linewidth|textwidth|columnwidth|hsize)/.exec(options);
+  if (w) return { frac: w[1] ? Number(w[1]) : 1 };
+  const units: Record<string, number> = { pt: 1, bp: 72.27 / 72, mm: 2.84528, cm: 28.4528, in: 72.27, pc: 12 };
+  const a = /(?:^|,)\s*width\s*=\s*([\d.]+)\s*(pt|bp|mm|cm|in|pc)/.exec(options);
+  if (a) return { pt: Number(a[1]) * units[a[2]] };
+  const sc = /(?:^|,)\s*scale\s*=\s*([\d.]+)/.exec(options);
+  if (sc) return { scale: Number(sc[1]) };
+  return {};
 }
 
 export interface FigureInfo {
@@ -104,9 +119,9 @@ function skipArgs(text: string, i: number, env: string): number {
 function describe(text: string, env: string, start: number, bodyStart: number, bodyEnd: number, end: number): FigureInfo {
   const body = text.slice(bodyStart, bodyEnd);
   const graphics: Graphic[] = [];
-  for (const m of body.matchAll(/\\(includegraphics\*?|input|include|includepdf)\s*(?:\[[^\]]*\]\s*)?\{([^}]*)\}/g)) {
+  for (const m of body.matchAll(/\\(includegraphics\*?|input|include|includepdf)\s*(?:\[([^\]]*)\]\s*)?\{([^}]*)\}/g)) {
     if (commented(text, bodyStart + m.index!)) continue;
-    graphics.push({ kind: m[1].startsWith("include") && m[1] !== "include" ? "graphics" : "input", path: m[2].trim() });
+    graphics.push({ kind: m[1].startsWith("include") && m[1] !== "include" ? "graphics" : "input", path: m[3].trim(), options: m[2] });
   }
   return { env, start, end, bodyStart, bodyEnd, graphics, caption: arg(text, bodyStart, bodyEnd, "caption"), label: arg(text, bodyStart, bodyEnd, "label") };
 }

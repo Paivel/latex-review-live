@@ -2,7 +2,7 @@
   "name": "latex-review-live",
   "displayName": "LaTeX Review and Visual Editor",
   "description": "Track changes with accept/reject, review comments, and a visual editor that shows the document like the PDF and lets you edit it there.",
-  "version": "0.3.7",
+  "version": "0.4.0",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
@@ -170,6 +170,11 @@
         "command": "latexReview.revealChange",
         "title": "Go to Change",
         "category": "LaTeX Review"
+      },
+      {
+        "command": "latexReview.visualUndo",
+        "title": "Undo in the Visual Editor",
+        "category": "LaTeX Review"
       }
     ],
     "keybindings": [
@@ -238,6 +243,26 @@
         "mac": "cmd+u",
         "args": "underline",
         "when": "editorTextFocus && !editorReadonly && editorLangId =~ /^(latex|tex)$/"
+      },
+      {
+        "command": "latexReview.visualUndo",
+        "key": "ctrl+z",
+        "mac": "cmd+z",
+        "args": false,
+        "when": "activeWebviewPanelId =~ /latexReview\\.visual$/"
+      },
+      {
+        "command": "latexReview.visualUndo",
+        "key": "ctrl+shift+z",
+        "mac": "cmd+shift+z",
+        "args": true,
+        "when": "activeWebviewPanelId =~ /latexReview\\.visual$/"
+      },
+      {
+        "command": "latexReview.visualUndo",
+        "key": "ctrl+y",
+        "args": true,
+        "when": "activeWebviewPanelId =~ /latexReview\\.visual$/"
       }
     ],
     "viewsContainers": {
@@ -359,6 +384,10 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "latexReview.visualUndo",
+          "when": "false"
+        },
         {
           "command": "latexReview.formatSource",
           "when": "false"

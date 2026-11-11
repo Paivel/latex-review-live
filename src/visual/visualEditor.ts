@@ -5,7 +5,7 @@ import { applyOwnEdit } from "../own-edits";
 import { ReviewStore } from "../review/review";
 import { readAux } from "../preview/aux";
 import { TEXT_SYMBOLS } from "../preview/symbols";
-import { fieldEdit, figureAt, graphicsPaths, imageCandidates } from "./figure";
+import { fieldEdit, figureAt, graphicSize, graphicsPaths, imageCandidates } from "./figure";
 import { VDoc, VImage, buildDoc } from "./model";
 import { parseBbl } from "./bbl";
 import { pdfSize, reactioLabels } from "./figureFiles";
@@ -21,6 +21,8 @@ type FromPage =
   | { type: "reveal"; offset: number }
   | { type: "decide"; accept: boolean; curStart: number; curEnd: number }
   | { type: "source" }
+  | { type: "openInput"; file: string }
+  | { type: "undo"; redo: boolean }
   | { type: "editFigure"; file: string; entry?: string };
 
 /**
@@ -37,6 +39,10 @@ export class VisualEditor implements vscode.Disposable {
       // Cmd+B / Cmd+I / Cmd+U in the page: VS Code takes these keys (Cmd+B hides the side bar), so they come back as a command.
       vscode.commands.registerCommand("latexReview.visualFormat", (cmd: string) => {
         for (const p of this.panels.values()) if (p.panel.active) void p.panel.webview.postMessage({ type: "format", cmd });
+      }),
+      // Cmd+Z / Cmd+Shift+Z in the page: the page sends what it has not sent yet, then the source's history steps.
+      vscode.commands.registerCommand("latexReview.visualUndo", (redo?: boolean) => {
+        for (const p of this.panels.values()) if (p.panel.active) void p.panel.webview.postMessage({ type: "undo", redo: !!redo });
       }),
       vscode.workspace.onDidChangeTextDocument((e) => this.panels.get(e.document.uri.toString())?.schedule(60)),
       vscode.workspace.onDidSaveTextDocument((d) => this.panels.get(d.uri.toString())?.schedule(300)),
@@ -151,7 +157,10 @@ class Panel {
             // A PDF is shown as a PNG the system draws; until it is ready, or if it cannot be drawn, the page tries pdf.js.
             const size = /\.pdf$/i.test(p) ? pdfSize(p) : undefined;
             const labels = entry ? reactioLabels(entry) : undefined;
-            const extra = { file: p, entry, widthPt: size?.w, heightPt: size?.h, labels };
+            // \includegraphics[width=..] or [scale=..] sets the size as in LaTeX; an \input drawing sizes itself.
+            const want = g.kind === "graphics" ? graphicSize(g.options) : {};
+            const widthPt = want.pt ?? (size && want.scale ? size.w * want.scale : size?.w);
+            const extra = { file: p, entry, widthPt: want.frac ? undefined : widthPt, heightPt: size?.h, widthFrac: want.frac, labels };
             // Quick Look and pdftoppm read the PDF; in a folder VS Code does not trust, pdf.js in the page draws it instead.
             if (/\.pdf$/i.test(p) && vscode.workspace.isTrusted) {
               const png = pictureOf(p, path.join(this.storage.fsPath, "pictures"), () => this.schedule(0));
@@ -179,6 +188,13 @@ class Panel {
       tracking: !!review?.tracking,
       marks: (review?.changes ?? []).map((c) => ({ curStart: c.curStart, curEnd: c.curEnd, deleted: c.deleted })),
       images,
+      inputFile: (p: string) => {
+        for (const c of /\.[a-z]+$/i.test(p) ? [p] : [`${p}.tex`, p]) {
+          const f = path.resolve(dir, c);
+          if (fs.existsSync(f) && fs.statSync(f).isFile()) return f;
+        }
+        return undefined;
+      },
     });
   }
 
@@ -269,6 +285,21 @@ class Panel {
         const cmds = await vscode.commands.getCommands(true);
         if (cmds.includes("reactioLatex.editFigureSource")) return vscode.commands.executeCommand("reactioLatex.editFigureSource", target);
         return vscode.commands.executeCommand("vscode.open", vscode.Uri.file(m.file), vscode.ViewColumn.Beside);
+      }
+      case "openInput": {
+        // Only a file this document \inputs.
+        const known = this.build().blocks.flatMap((b) => b.inputs ?? []).some((x) => x.file === m.file);
+        if (!known) return;
+        return vscode.window.showTextDocument(vscode.Uri.file(m.file), { viewColumn: vscode.ViewColumn.One });
+      }
+      case "undo": {
+        // One history with the source: undo it in the document's text editor, then come back.
+        const shown = vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === doc.uri.toString());
+        await vscode.window.showTextDocument(doc, { viewColumn: shown?.viewColumn ?? vscode.ViewColumn.One, preserveFocus: false });
+        await vscode.commands.executeCommand(m.redo ? "redo" : "undo");
+        this.panel.reveal(this.panel.viewColumn, false);
+        this.schedule(0, true);
+        return;
       }
       case "source": {
         const ed = await vscode.window.showTextDocument(doc, { viewColumn: vscode.ViewColumn.One, preserveFocus: false });

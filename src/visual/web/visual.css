@@ -70,3 +70,30 @@ details.pre summary { font-family: var(--vscode-font-family); font-size: 12px; c
 .pop button.plain { background: #eef1f8; color: #333; }
 .pop button:disabled { opacity: .45; cursor: default; }
 h1.refs.toggle { cursor: pointer; }
+
+/* Lists, title, theorem-like environments, \input chips */
+.vlist { margin: .4em 0 .4em 0; padding-left: 1.6em; }
+.vlist.description { padding-left: 0; }
+.vlist.description .vitem { margin: .2em 0 .2em 1.6em; text-indent: -1.6em; }
+.vlist .vitem { margin: .15em 0; }
+.itemlabel { font-weight: 700; }
+.itemtext:empty, .envinner:empty { display: inline-block; min-width: 2em; }
+.titleblock { text-align: center; margin: .5em 0 1.4em; }
+.doctitle { font-size: 1.6em; font-weight: 700; line-height: 1.25; margin-bottom: .5em; }
+.docauthor { font-size: 1.05em; margin-bottom: .3em; }
+.docdate { color: #555; }
+.envbox { margin: .8em 0; }
+.envtitle { font-weight: 700; }
+.envbox.proof .envtitle { font-weight: 400; font-style: italic; }
+.envbox:not(.proof):not(.abstract):not(.definition):not(.remark):not(.example) .envinner { font-style: italic; }
+.envbox.abstract { margin: 1em 2.5em; font-size: .93em; }
+.envbox.abstract > .envtitle { display: block; text-align: center; margin-bottom: .3em; }
+.qed { float: right; }
+.inputs { display: flex; flex-wrap: wrap; gap: 6px; margin: .4em 0; }
+.chip { font-family: var(--vscode-editor-font-family, monospace); font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #eef1f8; color: #1f5fa8; cursor: pointer; }
+.chip:hover { background: #dfe6f7; }
+.chip.missing { color: #999; cursor: default; }
+.block { position: relative; }
+.srctoggle { position: absolute; right: -8px; top: 0; font: 11px var(--vscode-font-family, sans-serif); border: 1px solid #ddd; background: #fff; color: #888; border-radius: 4px; padding: 0 5px; cursor: pointer; opacity: 0; }
+.block:hover > .srctoggle { opacity: 1; }
+.katex { text-indent: 0; }
