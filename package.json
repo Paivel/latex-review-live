@@ -2,7 +2,7 @@
   "name": "latex-review-live",
   "displayName": "LaTeX Review and Live Preview",
   "description": "Track changes with accept/reject, review comments, and an Obsidian-style live preview that hides LaTeX code while you edit.",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
@@ -41,6 +41,11 @@
         "title": "Open Visual Editor",
         "category": "LaTeX Review",
         "icon": "$(book)"
+      },
+      {
+        "command": "latexReview.formatSource",
+        "title": "Bold, Italic or Underline in LaTeX",
+        "category": "LaTeX Review"
       },
       {
         "command": "latexReview.visualFormat",
@@ -231,6 +236,27 @@
         "mac": "cmd+u",
         "args": "underline",
         "when": "activeWebviewPanelId == 'latexReview.visual'"
+      },
+      {
+        "command": "latexReview.formatSource",
+        "key": "ctrl+b",
+        "mac": "cmd+b",
+        "args": "bold",
+        "when": "editorTextFocus && !editorReadonly && editorLangId =~ /^(latex|tex)$/"
+      },
+      {
+        "command": "latexReview.formatSource",
+        "key": "ctrl+i",
+        "mac": "cmd+i",
+        "args": "italic",
+        "when": "editorTextFocus && !editorReadonly && editorLangId =~ /^(latex|tex)$/"
+      },
+      {
+        "command": "latexReview.formatSource",
+        "key": "ctrl+u",
+        "mac": "cmd+u",
+        "args": "underline",
+        "when": "editorTextFocus && !editorReadonly && editorLangId =~ /^(latex|tex)$/"
       }
     ],
     "viewsContainers": {
@@ -362,6 +388,10 @@
         }
       ],
       "commandPalette": [
+        {
+          "command": "latexReview.formatSource",
+          "when": "false"
+        },
         {
           "command": "latexReview.visualFormat",
           "when": "false"

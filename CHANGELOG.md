@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.6
+
+- Cmd+B, Cmd+I and Cmd+U (Ctrl on Windows and Linux) in a .tex editor wrap the selection in \textbf{..}, \textit{..} or \underline{..}; with the caret or selection already inside one, they take it out again. With no selection they insert an empty group.
+
 ## 0.2.5
 
 - Visual editor: Cmd+B, Cmd+I and Cmd+U (Ctrl on Windows and Linux) make the selected text bold, italic or underlined; the source gets \textbf, \textit or \underline. Pressing again removes it.
