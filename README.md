@@ -5,6 +5,8 @@ Two things LaTeX in VS Code is missing, in one extension:
 1. **Review mode**: track changes as in Word, accept or reject each change, and comment on the text.
 2. **Visual editor**: the document drawn like the PDF in a tab beside the source, and edited there.
 
+![The visual editor with tracked changes: insertions underlined in blue, deletions struck through in red](images/visual-editor.png)
+
 Your `.tex` file always stays plain LaTeX. It builds with LaTeX Workshop as before, and SyncTeX keeps working.
 
 ## Review mode
