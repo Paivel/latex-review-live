@@ -83,7 +83,11 @@ a=b \label{eq:e}
     const tb = d.blocks.find((b) => b.titleBlock)!;
     expect(tb.titleBlock!.title!.src).toBe("A Title");
     expect(tb.hideSource).toBe(true);
-    expect(d.blocks.find((b) => b.envbox?.title === "Abstract")!.envbox!.inner.src).toBe("Short summary.");
+    const ab = d.blocks.findIndex((b) => b.wrap?.env === "abstract" && b.wrap.side === "begin");
+    expect(d.blocks[ab].wrap!.title).toBe("Abstract");
+    expect(d.blocks[ab + 1].within).toBe("abstract");
+    expect(d.blocks[ab + 1].src.trim()).toBe("Short summary.");
+    expect(d.blocks[ab + 2].wrap?.side).toBe("end");
     expect(d.blocks.find((b) => b.envbox?.title === "Theorem")!.envbox!.num).toBe("1");
     expect(d.blocks.find((b) => b.list)!.list!.items.map((i) => i.text.src)).toEqual(["one", "two"]);
     expect(d.blocks.find((b) => b.inputs)!.inputs).toEqual([{ path: "chapters/x", file: "/abs/chapters/x.tex" }]);
@@ -92,5 +96,44 @@ a=b \label{eq:e}
     const p = d.blocks.find((b) => b.kind === "para" && b.src.startsWith("See"))!;
     const shows = (p.nodes ?? []).filter((n: any) => n.t === "atom").map((n: any) => n.show);
     expect(shows).toEqual(["fig. 1", "Equation (1)", "Section 1"]);
+  });
+});
+
+describe("achemso", () => {
+  const text = `\\documentclass[journal=jacsat]{achemso}
+\\author{Andrew Other}
+\\affiliation[U]{Dept, Unknown University}
+\\author{Ken Leader}
+\\email{k@u.uu}
+\\alsoaffiliation[S]{Second University}
+\\title[Short]{A demo of \\textsf{achemso}\\footnote{note}}
+\\begin{document}
+%%%%%%%%
+%% a comment
+%%%%%%%%
+\\begin{abstract}
+  First paragraph.
+
+  Second paragraph.
+\\end{abstract}
+\\begin{suppinfo}
+\\begin{itemize}
+  \\item File
+\\end{itemize}
+\\end{suppinfo}
+\\end{document}
+`;
+  const d = buildDoc({ text, uri: "u", version: 1, name: "m", look: {}, tracking: false, marks: [], images: () => [] });
+  it("prints the title block without \\maketitle", () => {
+    const t = d.blocks.find((b) => b.virtual)!.titleBlock!;
+    expect(t.title!.src).toContain("A demo");
+    expect(t.authors.map((a) => a.src)).toEqual(["Andrew Other", "Ken Leader"]);
+    expect(t.affiliations.map((a) => a.src)).toEqual(["Dept, Unknown University", "Second University"]);
+    expect(t.emails).toEqual(["k@u.uu"]);
+  });
+  it("splits open environments into blocks and folds comments", () => {
+    expect(d.blocks.filter((b) => b.within === "abstract" && b.kind === "para").length).toBe(2);
+    expect(d.blocks.some((b) => b.within === "suppinfo" && b.list)).toBe(true);
+    expect(d.blocks.some((b) => b.commentOnly)).toBe(true);
   });
 });

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.2
+
+- Visual editor: achemso documents get their title block without \maketitle: title, every \author, affiliations and e-mails.
+- Visual editor: abstract, acknowledgement, suppinfo, tocentry, quote and center hold ordinary paragraphs, lists and equations, each edited on its own; the environment's name is drawn as its heading.
+- Visual editor: blocks of comments fold to a thin line (hover to open), since the PDF does not show them.
+- Visual editor: \ch{} (chemformula) draws like \ce{}; \footnote and \bibnote show a mark; \LaTeXe, \latin and a backslash before a line break read as in the PDF; \textsf is sans-serif.
+- Visual editor: fixed wide gaps inside formulas with sub- and superscripts (a list style was leaking into KaTeX).
+
 ## 0.4.1
 
 - Visual editor: closer to the article class in the PDF: a regular-weight title, author and date at \large, a smaller abstract, no blank gap between paragraphs, and -- / --- / `` '' drawn as dashes and curly quotes (the source keeps them as typed).

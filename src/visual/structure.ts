@@ -117,6 +117,18 @@ export function commandArg(text: string, name: string, from = 0, to = text.lengt
   return null;
 }
 
+/** The braced argument of every \\name{..} in text (outside comments). */
+export function commandArgs(text: string, name: string, from = 0, to = text.length): Range[] {
+  const out: Range[] = [];
+  let at = from;
+  for (;;) {
+    const r = commandArg(text, name, at, to);
+    if (!r) return out;
+    out.push(r);
+    at = r.end + 1;
+  }
+}
+
 // ---- Theorem-like environments --------------------------------------------
 
 const DEFAULT_THEOREMS: Record<string, string> = {

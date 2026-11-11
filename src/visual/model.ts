@@ -2,7 +2,7 @@
 import { Block, MATH_ENVS, headingNumbers, splitBlocks } from "./blocks";
 import { Inline, Lookup, tokenize } from "./inline";
 import { preambleMacros } from "./macros";
-import { ListInfo, commandArg, envBox, inputPaths, onlyCommands, parseList, theoremEnvs } from "./structure";
+import { ListInfo, commandArg, commandArgs, envBox, inputPaths, onlyCommands, parseList, theoremEnvs } from "./structure";
 
 /** Inline nodes plus track-changes marks. */
 export type MNode =
@@ -64,7 +64,15 @@ export interface VBlock {
   /** list: its items. */
   list?: VList;
   /** code block with \maketitle: the title, authors and date from the preamble. */
-  titleBlock?: { title: VText | null; author: VText | null; date: VText | null };
+  titleBlock?: { title: VText | null; authors: VText[]; date: VText | null; affiliations: VText[]; emails: string[] };
+  /** The \begin / \end line of an open environment (abstract, acknowledgement...): drawn as its heading, or not at all. */
+  wrap?: { env: string; side: "begin" | "end"; title: string };
+  /** The innermost open environment the block sits in. */
+  within?: string;
+  /** Only comments: drawn folded. */
+  commentOnly?: boolean;
+  /** Not in the source: a title the class prints on its own (achemso). */
+  virtual?: boolean;
   /** theorem-like environment, proof or abstract. */
   envbox?: { title: string; num?: string; note: VText | null; inner: VText };
   /** code block of \input / \include lines: the files, found or not. */
@@ -187,8 +195,34 @@ export function buildDoc(inp: BuildInput): VDoc {
   const vtext = (r: { start: number; end: number } | null): VText | null => (r ? { start: r.start, end: r.end, nodes: inline(r.start, r.end), src: text.slice(r.start, r.end) } : null);
   const vlist = (l: ListInfo): VList => ({ env: l.env, items: l.items.map((it) => ({ text: vtext(it.text)!, label: vtext(it.label), sub: it.sub.map(vlist) })) });
   const thmCount: Record<string, number> = {};
+  const titleOf = (to: number): NonNullable<VBlock["titleBlock"]> => {
+    const affiliations: VText[] = [];
+    for (const name of ["affiliation", "alsoaffiliation", "altaffiliation"]) {
+      for (const r of commandArgs(text, name, 0, to)) if (!affiliations.some((a) => a.src === text.slice(r.start, r.end))) affiliations.push(vtext(r)!);
+    }
+    affiliations.sort((a, b) => a.start - b.start);
+    return {
+      title: vtext(commandArg(text, "title", 0, to)),
+      authors: commandArgs(text, "author", 0, to).map((r) => vtext(r)!),
+      date: vtext(commandArg(text, "date", 0, to)),
+      affiliations,
+      emails: commandArgs(text, "email", 0, to).map((r) => text.slice(r.start, r.end).trim()),
+    };
+  };
+  const WRAP_TITLES: Record<string, string> = {
+    abstract: "Abstract", acknowledgement: "Acknowledgement", acknowledgements: "Acknowledgements", acknowledgment: "Acknowledgment", acknowledgments: "Acknowledgments",
+    suppinfo: "Supporting Information Available", tocentry: "TOC Graphic",
+  };
+  const openStack: string[] = [];
   const out: VBlock[] = blocks.map((b) => {
     const vb: VBlock = { kind: b.kind, start: b.start, end: b.end, src: text.slice(b.start, b.end) };
+    if (b.wrap === "end") openStack.pop();
+    if (openStack.length) vb.within = openStack[openStack.length - 1];
+    if (b.wrap && b.env) {
+      vb.wrap = { env: b.env, side: b.wrap, title: WRAP_TITLES[b.env] ?? "" };
+      vb.hideSource = true;
+      if (b.wrap === "begin") openStack.push(b.env);
+    }
     vb.changed = marks.some((m) => m.curStart <= b.end && (m.curEnd > b.start || (m.curEnd === m.curStart && m.curStart >= b.start)));
     if (b.kind === "code" && inp.bbl?.length && /\\(bibliography|printbibliography)\b/.test(vb.src)) {
       vb.bib = inp.bbl.map((e) => ({ label: e.label, nodes: tokenize(e.tex, look) as MNode[] }));
@@ -198,7 +232,8 @@ export function buildDoc(inp: BuildInput): VDoc {
       const l = parseList(text, at);
       if (l) vb.list = vlist(l);
     }
-    if (b.kind === "code") {
+    if (b.kind === "code" && !b.wrap) {
+      vb.commentOnly = vb.src.split("\n").every((l) => !l.trim() || /^\s*%/.test(l));
       const at = b.start + (/^[ \t]*/.exec(vb.src)?.[0].length ?? 0);
       const box = b.env ? envBox(text, at, theorems) : null;
       if (box) {
@@ -209,7 +244,7 @@ export function buildDoc(inp: BuildInput): VDoc {
         if (num && lab) num = look.labels?.get(lab[1]) ?? num;
         vb.envbox = { title: box.title, num, note: vtext(box.note), inner: vtext(box.inner)! };
       } else if (/\\maketitle\b/.test(vb.src)) {
-        vb.titleBlock = { title: vtext(commandArg(text, "title", 0, b.start)), author: vtext(commandArg(text, "author", 0, b.start)), date: vtext(commandArg(text, "date", 0, b.start)) };
+        vb.titleBlock = titleOf(b.start);
         vb.hideSource = onlyCommands(vb.src, ["maketitle"]);
       } else {
         const paths = inputPaths(vb.src);
@@ -268,6 +303,12 @@ export function buildDoc(inp: BuildInput): VDoc {
     if (i < 0) i = out.length;
     out.splice(i, 0, { kind: "deleted", start: m.curStart, end: m.curStart, src: "", nodes: [{ t: "del", s: m.deleted, c }], changed: true });
   });
+  const cls0 = /\\documentclass\s*(?:\[[^\]]*\])?\s*\{([^}]*)\}/.exec(pre);
+  if (cls0?.[1].trim() === "achemso" && !out.some((b) => b.titleBlock) && blocks[0]?.kind === "preamble") {
+    // achemso prints the title on its own at \begin{document}.
+    const at = blocks[0].end;
+    out.splice(1, 0, { kind: "code", start: at, end: at, src: "", titleBlock: titleOf(at), virtual: true, hideSource: true });
+  }
   const natbib = /\\usepackage\s*\[([^\]]*)\]\s*\{natbib\}/.exec(pre.replace(/(^|[^\\])%.*$/gm, "$1"));
   const cls = /\\documentclass\s*(?:\[([^\]]*)\])?\s*\{([^}]*)\}/.exec(pre);
   const achemso = cls?.[2].trim() === "achemso";

@@ -72,10 +72,10 @@ details.pre summary { font-family: var(--vscode-font-family); font-size: 12px; c
 h1.refs.toggle { cursor: pointer; }
 
 /* Lists, title, theorem-like environments, \input chips */
-.vlist { margin: .4em 0 .4em 0; padding-left: 1.6em; }
-.vlist.description { padding-left: 0; }
-.vlist.description .vitem { margin: .2em 0 .2em 1.6em; text-indent: -1.6em; }
-.vlist .vitem { margin: .15em 0; }
+.texlist { margin: .4em 0 .4em 0; padding-left: 1.6em; }
+.texlist.description { padding-left: 0; }
+.texlist.description .vitem { margin: .2em 0 .2em 1.6em; text-indent: -1.6em; }
+.texlist .vitem { margin: .15em 0; }
 .itemlabel { font-weight: 700; }
 .itemtext:empty, .envinner:empty { display: inline-block; min-width: 2em; }
 .titleblock { text-align: center; margin: .5em 0 1.4em; }
@@ -98,3 +98,23 @@ h1.refs.toggle { cursor: pointer; }
 .block:hover > .srctoggle { opacity: 1; }
 .katex { text-indent: 0; }
 .atom.space:hover { background: none; }
+
+/* Open environments: their body is ordinary blocks */
+.wrap .wraptitle { font-weight: 700; }
+.wrap-abstract .wraptitle { text-align: center; font-size: .9em; margin: 1em 0 .3em; }
+:is(.wrap-acknowledgement, .wrap-acknowledgements, .wrap-acknowledgment, .wrap-acknowledgments, .wrap-suppinfo) .wraptitle { font-size: 1.2em; margin: 1.3em 0 .5em; }
+.wrap-tocentry .wraptitle { font-size: .9em; margin: 1em 0 .3em; }
+.wrap.block:not(:has(.wraptitle)) { min-height: 0; }
+.in-abstract { margin: 0 2.5em; font-size: .9em; }
+.in-abstract.para p, .in-quotation.para p { text-indent: 1.5em; }
+:is(.in-quote, .in-quotation) { margin: 0 2.5em; }
+.in-center { text-align: center; }
+.in-center p { text-align: center; }
+.in-tocentry { font-family: Helvetica, Arial, sans-serif; font-size: .8em; border-left: 1px solid #999; border-right: 1px solid #999; padding: 0 .8em; margin: 0; }
+.in-tocentry.para p { margin-bottom: .5em; }
+details.cmt summary { font: 11px var(--vscode-font-family, sans-serif); color: #bbb; cursor: pointer; list-style: none; opacity: 0; height: 6px; overflow: hidden; }
+details.cmt summary::-webkit-details-marker { display: none; }
+.block.comments:hover details.cmt summary, details.cmt[open] summary { opacity: 1; height: auto; }
+.docaffil { font-style: italic; font-size: .95em; margin-bottom: .2em; }
+.docemail { font-size: .95em; margin: .5em 0 .4em; }
+.fmt.textsf { font-family: Helvetica, Arial, sans-serif; font-size: .95em; }

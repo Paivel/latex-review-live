@@ -17,7 +17,12 @@ export interface Block {
   figure?: FigureInfo;
   /** math: environment name, or "\\[" / "$$". */
   env?: string;
+  /** The \begin or \end line of an environment whose body is split into blocks of its own (abstract, acknowledgement...). */
+  wrap?: "begin" | "end";
 }
+
+/** Environments that hold ordinary paragraphs, lists and equations: their body is split like the document. */
+export const OPEN_ENVS = ["abstract", "acknowledgement", "acknowledgements", "acknowledgment", "acknowledgments", "suppinfo", "tocentry", "quote", "quotation", "center"];
 
 const HEADINGS = ["part", "chapter", "section", "subsection", "subsubsection", "paragraph", "subparagraph"];
 export const MATH_ENVS = ["equation", "equation*", "align", "align*", "gather", "gather*", "multline", "multline*", "eqnarray", "eqnarray*", "displaymath", "flalign", "flalign*", "alignat", "alignat*"];
@@ -57,7 +62,7 @@ export function commandOnly(line: string): boolean {
     while (j < s.length && /[a-zA-Z@]/.test(s[j])) j++;
     if (j === i + 1) return false;
     const name = s.slice(i + 1, j);
-    if (/^(text\w+|emph|cite\w*|\w*cite|ref|eqref|cref|Cref|rcmpd|cmpd|LaTeX|TeX|ldots|dots|underline)$/.test(name)) return false;
+    if (/^(text\w+|emph|cite\w*|\w*cite|ref|eqref|cref|Cref|rcmpd|cmpd|LaTeX|LaTeXe|TeX|ldots|latin|footnote|bibnote|ch|ce|dots|underline)$/.test(name)) return false;
     if (s[j] === "*") j++;
     for (;;) {
       while (s[j] === " ") j++;
@@ -81,6 +86,8 @@ export function splitBlocks(text: string): Block[] {
   }
   const endDoc = text.indexOf("\\end{document}", i);
   const stop = endDoc >= 0 ? endDoc : text.length;
+  // Open environments we are inside, innermost last.
+  const open: string[] = [];
 
   while (i < stop) {
     // Skip blank lines.
@@ -92,7 +99,26 @@ export function splitBlocks(text: string): Block[] {
     const p = ls + indent;
     const rest = text.slice(p, le);
 
+    const close = /^\\end\s*\{([^}]+)\}\s*(%.*)?$/.exec(rest);
+    if (close && open[open.length - 1] === close[1]) {
+      open.pop();
+      blocks.push({ kind: "code", start: ls, end: le, env: close[1], wrap: "end" });
+      i = le + 1;
+      continue;
+    }
     const env = /^\\begin\s*\{([^}]+)\}/.exec(rest);
+    if (env && OPEN_ENVS.includes(env[1])) {
+      // Split the body only when \begin and \end stand on lines of their own.
+      const e = envEnd(text, p, env[1]);
+      const endAt = e < 0 ? -1 : e - `\\end{${env[1]}}`.length;
+      const lineOk = /^\s*(\[[^\]]*\])?\s*(%.*)?$/.test(rest.slice(env[0].length));
+      if (e > 0 && e <= stop && lineOk && !text.slice(text.lastIndexOf("\n", endAt - 1) + 1, endAt).trim() && !text.slice(e, lineEnd(text, e)).replace(/%.*/, "").trim()) {
+        open.push(env[1]);
+        blocks.push({ kind: "code", start: ls, end: le, env: env[1], wrap: "begin" });
+        i = le + 1;
+        continue;
+      }
+    }
     if (env) {
       const name = env[1];
       let e = envEnd(text, p, name);
@@ -134,7 +160,7 @@ export function splitBlocks(text: string): Block[] {
         if (ns >= stop) break;
         const ne = Math.min(lineEnd(text, ns), stop);
         const nl = text.slice(ns, ne).trim();
-        if (!nl || !(nl.startsWith("%") || commandOnly(nl)) || /^\\(begin|part|chapter|section|subsection|subsubsection|paragraph)\b/.test(nl) || nl.startsWith("\\[")) break;
+        if (!nl || !(nl.startsWith("%") || commandOnly(nl)) || /^\\(begin|end|part|chapter|section|subsection|subsubsection|paragraph)\b/.test(nl) || nl.startsWith("\\[")) break;
         e = ne;
       }
       blocks.push({ kind: "code", start: ls, end: e });

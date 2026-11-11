@@ -20,7 +20,7 @@ export const MATH_SYMBOLS: Record<string, string> = {
 };
 
 export const TEXT_SYMBOLS: Record<string, string> = {
-  and: "\u2003\u2003", ldots: "…", dots: "…", textellipsis: "…", LaTeX: "LaTeX", TeX: "TeX", textdegree: "°", degree: "°", textpm: "±", pm: "±",
+  and: "\u2003\u2003", ldots: "…", dots: "…", textellipsis: "…", LaTeX: "LaTeX", LaTeXe: "LaTeX2\u03b5", TeX: "TeX", textdegree: "°", degree: "°", textpm: "±", pm: "±",
   times: "×", texttimes: "×", textendash: "–", textemdash: "—", textbackslash: "\\", textasciitilde: "~", textbullet: "•",
   copyright: "©", textcopyright: "©", textregistered: "®", texttrademark: "™", S: "§", P: "¶", dag: "†", ddag: "‡",
   ss: "ß", ae: "æ", AE: "Æ", oe: "œ", OE: "Œ", o: "ø", O: "Ø", aa: "å", AA: "Å", l: "ł", L: "Ł", i: "ı",

@@ -19,7 +19,7 @@ export interface Atom {
   tex?: string;
 }
 
-export const FORMAT_CMDS = ["textbf", "textit", "emph", "underline", "texttt", "textsc", "textsf", "textrm", "textup", "textsl"];
+export const FORMAT_CMDS = ["textbf", "textit", "emph", "underline", "texttt", "textsc", "textsf", "textrm", "textup", "textsl", "latin"];
 const CITE = /^(?:[a-zA-Z]*cite[a-zA-Z]*|nocite)$/;
 const REF = /^(?:ref|eqref|cref|Cref|autoref|pageref|vref|nameref)$/;
 const CMPD = /^(?:cmpd|rcmpd|refcmpd|cmpdplain)$/;
@@ -110,7 +110,9 @@ export function tokenize(s: string, look: Lookup = {}, base = 0): Inline[] {
       if (!/[a-zA-Z@]/.test(n)) {
         // Control symbols: \, \; \  \- \' etc.
         const src = s.slice(i, i + 2);
-        atom({ t: "atom", src, kind: n === "," || n === " " || n === ";" || n === ":" || n === "!" ? "space" : "cmd", show: n === "," || n === " " ? " " : src });
+        // "\" at the end of a line is a control space too.
+        const sp = n === "," || n === " " || n === "\n" || n === "\t";
+        atom({ t: "atom", src, kind: sp || n === ";" || n === ":" || n === "!" ? "space" : "cmd", show: sp ? " " : src });
         i += 2;
         continue;
       }
@@ -144,11 +146,16 @@ export function tokenize(s: string, look: Lookup = {}, base = 0): Inline[] {
         i = a.end;
         continue;
       }
-      if ((name === "ce" || name === "pu") && s[j] === "{") {
+      if ((name === "footnote" || name === "bibnote" || name === "thanks") && s[j] === "{") {
+        // A note mark where LaTeX puts one; the text is in the source.
+        const e = groupEnd(s, j);
+        if (e > 0) { atom({ t: "atom", src: s.slice(i, e), kind: "cmd", show: "\u2020" }); i = e; continue; }
+      }
+      if ((name === "ce" || name === "pu" || name === "ch") && s[j] === "{") {
         // mhchem in text: drawn by KaTeX's mhchem like in math.
         const e = groupEnd(s, j);
         if (e > 0) {
-          atom({ t: "atom", src: s.slice(i, e), kind: "math", tex: `\\${name}{${s.slice(j + 1, e - 1)}}` });
+          atom({ t: "atom", src: s.slice(i, e), kind: "math", tex: `\\${name === "ch" ? "ce" : name}{${s.slice(j + 1, e - 1)}}` });
           i = e;
           continue;
         }

@@ -111,7 +111,36 @@ function renderBlock(b: VBlock): HTMLElement {
   box.dataset.end = String(b.end);
   box.dataset.bsrc = b.src;
   if (b.changed) box.classList.add("changed");
+  if (b.within) box.classList.add(`in-${b.within}`);
   blockOf.set(box, b);
+  if (b.virtual && b.titleBlock) { renderTitle(box, b); return box; }
+  if (b.wrap) {
+    // \begin{abstract} draws as the heading; \end{abstract} draws nothing. The LaTeX opens from the button.
+    box.classList.add("wrap", `wrap-${b.wrap.env}`);
+    if (b.wrap.side === "begin" && b.wrap.title) box.appendChild(el("div", "wraptitle", b.wrap.title));
+    const pre = el("pre", "code");
+    pre.textContent = b.src;
+    editable(pre, b.start, b.end, b.src, "code");
+    pre.contentEditable = "plaintext-only";
+    pre.spellcheck = false;
+    box.appendChild(pre);
+    sourceToggle(box, pre);
+    return box;
+  }
+  if (b.commentOnly) {
+    // Comments are not in the PDF: a thin fold, opened on click.
+    box.classList.add("comments");
+    const d = el("details", "cmt");
+    d.appendChild(el("summary", "", `% ${b.src.split("\n").filter((l) => l.trim()).length} comment lines`));
+    const pre = el("pre", "code");
+    pre.textContent = b.src;
+    editable(pre, b.start, b.end, b.src, "code");
+    pre.contentEditable = "plaintext-only";
+    pre.spellcheck = false;
+    d.appendChild(pre);
+    box.appendChild(d);
+    return box;
+  }
   switch (b.kind) {
     case "preamble": {
       const d = el("details", "pre");
@@ -280,7 +309,7 @@ function textRegion(tag: "span" | "div" | "h1", cls: string, t: VText, b: VBlock
 }
 
 function renderList(l: VList, b: VBlock): HTMLElement {
-  const list = el(l.env === "enumerate" ? "ol" : l.env === "description" ? "dl" : "ul", `vlist ${l.env}`) as HTMLElement;
+  const list = el(l.env === "enumerate" ? "ol" : l.env === "description" ? "dl" : "ul", `texlist ${l.env}`) as HTMLElement;
   for (const it of l.items) {
     const li = el(l.env === "description" ? "div" : "li", "vitem");
     if (it.label) {
@@ -322,7 +351,17 @@ function renderTitle(box: HTMLElement, b: VBlock) {
   const t = b.titleBlock!;
   const tb = el("div", "titleblock");
   if (t.title) tb.appendChild(textRegion("div", "doctitle", t.title, b));
-  if (t.author) tb.appendChild(textRegion("div", "docauthor", t.author, b));
+  if (t.authors.length) {
+    // One \author per person (achemso, revtex): "A, B and C"; one \author with \and: as written.
+    const row = el("div", "docauthor");
+    t.authors.forEach((a, k) => {
+      if (k > 0) row.appendChild(document.createTextNode(k === t.authors.length - 1 ? (t.authors.length > 2 ? ", and " : " and ") : ", "));
+      row.appendChild(textRegion("span", "author", a, b));
+    });
+    tb.appendChild(row);
+  }
+  for (const a of t.affiliations) tb.appendChild(textRegion("div", "docaffil", a, b));
+  if (t.emails.length) tb.appendChild(el("div", "docemail", `E-mail: ${t.emails.join("; ")}`));
   if (t.date) tb.appendChild(textRegion("div", "docdate", t.date, b));
   box.appendChild(tb);
 }
