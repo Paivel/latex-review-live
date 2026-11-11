@@ -1,12 +1,18 @@
-# Publishes to the VS Code Marketplace when a version tag (v0.5.6) is pushed.
-# Needs the repository secret VSCE_PAT: an Azure DevOps token with Marketplace > Manage.
-name: Publish
+# On a version tag (v0.5.6): test, build the .vsix and attach it to a GitHub release.
+# If the repository secret VSCE_PAT (an Azure DevOps token with Marketplace > Manage) exists,
+# the same .vsix is also published to the Marketplace; otherwise upload it by hand at
+# https://marketplace.visualstudio.com/manage.
+name: Release
 on:
   push:
     tags: ["v*"]
+permissions:
+  contents: write
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,10 +23,10 @@ jobs:
       - name: Tag matches package.json
         run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
       - run: npm run package
-      - run: npx vsce publish --no-dependencies --packagePath *.vsix
+      - name: GitHub release with the .vsix
+        run: gh release create "$GITHUB_REF_NAME" *.vsix --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md."
         env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: vsix
-          path: "*.vsix"
+          GH_TOKEN: ${{ github.token }}
+      - name: Publish to the Marketplace
+        if: ${{ env.VSCE_PAT != '' }}
+        run: npx vsce publish --no-dependencies --packagePath *.vsix
