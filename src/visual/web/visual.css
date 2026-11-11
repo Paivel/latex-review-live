@@ -34,7 +34,7 @@ code, .fmt.texttt { font-family: var(--vscode-editor-font-family, monospace); fo
 .pdf { min-height: 60px; }
 .pic { position: relative; max-width: 100%; margin: 0 auto .5em; }
 .pic img, .pic canvas { width: 100%; margin: 0; }
-.plabel { position: absolute; transform: translateX(-50%); white-space: nowrap; line-height: 1; font-family: Helvetica, Arial, sans-serif; font-weight: 700; }
+.plabel { position: absolute; transform: translate(-50%, .21em); white-space: nowrap; line-height: 1; font-family: Helvetica, Arial, sans-serif; font-weight: 700; }
 .missing { color: var(--muted); font-style: italic; font-size: .9em; margin: .5em 0; }
 .caption { text-align: left; font-size: .93em; margin: 0 auto; max-width: 92%; }
 .captext.empty:empty::before { content: attr(data-placeholder); color: #aaa; }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.5
+
+- Visual editor: Cmd+B, Cmd+I and Cmd+U (Ctrl on Windows and Linux) make the selected text bold, italic or underlined; the source gets \textbf, \textit or \underline. Pressing again removes it.
+- Visual editor: Reactio Draw labels sit on their baseline, as in the PDF.
+
 ## 0.2.4
 
 - Visual editor: figures are shown at their natural size, as LaTeX sets them (1:1, never wider than the line), scaled with the document's font size.

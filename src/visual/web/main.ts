@@ -598,11 +598,24 @@ page.addEventListener("keydown", (ev) => {
       if (next?.classList.contains("para")) { ev.preventDefault(); join(box, next); }
     }
   }
-  if ((ev.metaKey || ev.ctrlKey) && (ev.key === "b" || ev.key === "i")) {
+  if ((ev.metaKey || ev.ctrlKey) && !ev.altKey && !ev.shiftKey && ["b", "i", "u"].includes(ev.key.toLowerCase())) {
+    // The browser's own bold would run as well as VS Code's keybinding, which sends "format" back.
     ev.preventDefault();
-    document.execCommand(ev.key === "b" ? "bold" : "italic");
   }
 });
+
+/** Bold, italic or underline for the selection; serialize writes \\textbf, \\textit or \\underline. */
+function format(cmd: string) {
+  if (!["bold", "italic", "underline"].includes(cmd)) return;
+  const sel = getSelection();
+  const at = sel?.rangeCount ? sel.getRangeAt(0).startContainer : null;
+  const r = (at?.nodeType === 1 ? (at as HTMLElement) : at?.parentElement)?.closest<HTMLElement>(".region");
+  if (!r || r.dataset.region === "code") return;
+  document.execCommand("styleWithCSS", false, "false");
+  document.execCommand(cmd);
+  clearTimeout(timers.get(r));
+  timers.set(r, setTimeout(() => flush(r), 300));
+}
 
 function caretAtEnd(r: HTMLElement): boolean {
   const sel = getSelection();
@@ -802,6 +815,7 @@ window.addEventListener("message", (e) => {
   const m = e.data;
   if (m.type === "pictures") for (const [k, v] of Object.entries(m.items as Record<string, string>)) pictureData.set(k, v);
   if (m.type === "doc") render(m.doc, !!m.refresh);
+  if (m.type === "format") format(m.cmd);
   if (m.type === "cursor") {
     if (document.hasFocus() && page.contains(document.activeElement)) return;
     for (const box of page.querySelectorAll<HTMLElement>(":scope > .block")) {

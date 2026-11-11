@@ -34,6 +34,10 @@ export class VisualEditor implements vscode.Disposable {
   constructor(private store: ReviewStore, private extensionUri: vscode.Uri, private storage: vscode.Uri) {
     this.disposables.push(
       vscode.commands.registerCommand("latexReview.openVisualEditor", (uri?: vscode.Uri) => this.open(uri)),
+      // Cmd+B / Cmd+I / Cmd+U in the page: VS Code takes these keys (Cmd+B hides the side bar), so they come back as a command.
+      vscode.commands.registerCommand("latexReview.visualFormat", (cmd: string) => {
+        for (const p of this.panels.values()) if (p.panel.active) void p.panel.webview.postMessage({ type: "format", cmd });
+      }),
       vscode.workspace.onDidChangeTextDocument((e) => this.panels.get(e.document.uri.toString())?.schedule(60)),
       vscode.workspace.onDidSaveTextDocument((d) => this.panels.get(d.uri.toString())?.schedule(300)),
       store.onDidChange((r) => this.panels.get(r.uri.toString())?.schedule(30)),
