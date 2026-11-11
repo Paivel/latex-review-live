@@ -12,8 +12,9 @@ export function citeKeys(tex: string): string[] {
   const out = new Set<string>();
   for (const m of stripComments(tex).matchAll(CITE)) {
     for (const k of m[1].split(",")) {
-      const key = k.trim();
-      if (key && key !== "*") out.add(key);
+      // mciteplus: "*key" joins the previous reference into one item; the key itself has no star.
+      const key = k.trim().replace(/^\*/, "");
+      if (key) out.add(key);
     }
   }
   return [...out];

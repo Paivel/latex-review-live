@@ -147,7 +147,8 @@ export function tokenize(s: string, look: Lookup = {}, base = 0): Inline[] {
       if (CITE.test(name)) {
         const a = args(s, j, 1);
         const keys = (a.braces[0] ?? "").split(",").map((k) => k.trim()).filter(Boolean);
-        const nums = keys.map((k) => look.cites?.get(k) ?? "?");
+        // mciteplus starred keys (*key) are merged into the reference before them.
+        const nums = keys.filter((k) => !k.startsWith("*")).map((k) => look.cites?.get(k) ?? "?");
         atom({ t: "atom", src: s.slice(i, a.end), kind: "cite", show: compress(nums) });
         i = a.end;
         continue;

@@ -25,3 +25,10 @@ describe("bib keys", () => {
     expect(appendText("@a{x,}\n", "@a{y,}")).toBe("\n@a{y,}\n");
   });
 });
+
+describe("mciteplus", () => {
+  it("drops the star of merged keys", async () => {
+    const { citeKeys } = await import("../src/bib/keys");
+    expect(citeKeys("\\cite{Johnson1972,*Arduengo1992,*Eisenstein2005}")).toEqual(["Johnson1972", "Arduengo1992", "Eisenstein2005"]);
+  });
+});

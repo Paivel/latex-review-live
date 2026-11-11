@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1
+
+- Zotero: mciteplus starred keys (\\cite{a,*b}) are looked up without the star; in the visual editor a starred key does not add its own number.
+
 ## 0.5.0
 
 - Visual editor: a PDF view (PDF button in the bar). The real pages come from latexmk, rebuilt a moment after each edit from the editor's text (unsaved changes included) into .latex-review/live, with TeX run in the document's folder so pictures and .bib files resolve as usual. Click a paragraph, heading, list or equation: SyncTeX finds its line and that block opens over the page for editing; Done or Esc closes it and the next build shows the result. Text from an \\input file opens in the text editor. Works with TeX Live and MiKTeX on macOS, Windows and Linux; needs a trusted workspace. A "% !TEX program = xelatex" or "lualatex" line picks the engine.
