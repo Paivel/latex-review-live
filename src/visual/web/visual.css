@@ -68,3 +68,4 @@ details.pre summary { font-family: var(--vscode-font-family); font-size: 12px; c
 .pop .lrow code { flex: 1; font-family: var(--vscode-editor-font-family, monospace); }
 .pop button.plain { background: #eef1f8; color: #333; }
 .pop button:disabled { opacity: .45; cursor: default; }
+h1.refs.toggle { cursor: pointer; }

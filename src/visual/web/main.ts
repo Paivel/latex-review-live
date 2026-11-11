@@ -226,7 +226,16 @@ function renderBlock(b: VBlock): HTMLElement {
       pre.spellcheck = false;
       box.appendChild(pre);
       if (b.bib?.length) {
-        box.appendChild(el("h1", "refs", "References"));
+        // Only \bibliographystyle / \bibliography lines: the list stands for them, as in the PDF. Click the heading for the source.
+        const onlyBib = b.src.split("\n").every((l) => /^\s*(?:\\bibliographystyle\{[^}]*\}|\\bibliography\{[^}]*\}|\\printbibliography(?:\[[^\]]*\])?|%.*)?\s*$/.test(l));
+        const h = el("h1", "refs", "References");
+        if (onlyBib) {
+          pre.hidden = true;
+          h.title = "Click to show or hide the LaTeX";
+          h.classList.add("toggle");
+          h.addEventListener("click", () => { pre.hidden = !pre.hidden; });
+        }
+        box.appendChild(h);
         const list = el("div", "bib");
         for (const e of b.bib) {
           const row = el("div", "bibitem");

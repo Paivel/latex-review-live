@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.6
+
+- Visual editor: \bibliographystyle and \bibliography lines are hidden behind the reference list, as in the PDF; click "References" to show or hide them.
+
 ## 0.3.5
 
 - Visual editor: clicking a compound label on a picture copies its \rcmpd{..} at once; the box that opens keeps Insert.
