@@ -41,7 +41,8 @@ code, .fmt.texttt { font-family: var(--vscode-editor-font-family, monospace); fo
 .label { font-family: var(--vscode-editor-font-family, monospace); font-size: 11px; color: var(--muted); margin-top: 4px; text-align: left; max-width: 92%; margin-left: auto; margin-right: auto; }
 .label input { font: inherit; border: none; border-bottom: 1px dashed #bbb; background: transparent; color: #555; width: 18em; outline: none; }
 .label input:focus { border-bottom-color: var(--ins); }
-.eq { position: relative; margin: .8em 0; cursor: pointer; overflow-x: auto; }
+.eq { position: relative; margin: .8em 0; cursor: pointer; overflow-x: auto; overflow-y: hidden; }
+.eq > .katex-display { margin: 0; padding: .4em 0; }
 .eq:hover { background: #f7f7f7; }
 .eqnum { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
 .eqprev { margin: .5em 0; }

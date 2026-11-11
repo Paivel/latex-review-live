@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.7
+
+- Visual editor: after clicking an equation and leaving it unchanged, it is drawn as before (with the document's number), and no scroll bar is left under it.
+
 ## 0.3.6
 
 - Visual editor: \bibliographystyle and \bibliography lines are hidden behind the reference list, as in the PDF; click "References" to show or hide them.

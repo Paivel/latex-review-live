@@ -757,7 +757,8 @@ function openMath(box: HTMLElement) {
     setTimeout(() => {
       const nb = blockOf.get(box);
       if (!nb || !box.isConnected) return;
-      const fresh = renderBlock({ ...nb, src: t.value, tex: mathTex(t.value) });
+      // Unchanged: draw it as the document numbers it. Changed: a draft until the extension sends the new document.
+      const fresh = renderBlock(t.value === nb.src ? nb : { ...nb, src: t.value, tex: mathTex(t.value) });
       keyOf.set(fresh, "");
       box.replaceWith(fresh);
     }, 0);
