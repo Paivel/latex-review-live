@@ -8,3 +8,7 @@
 !THIRD-PARTY
 !images/icon.png
 !images/gutter-*.svg
+!dist/visual.js
+!dist/visual.css
+!dist/katex/**
+!dist/pdfjs/**

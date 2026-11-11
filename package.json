@@ -2,7 +2,7 @@
   "name": "latex-review-live",
   "displayName": "LaTeX Review and Live Preview",
   "description": "Track changes with accept/reject, review comments, and an Obsidian-style live preview that hides LaTeX code while you edit.",
-  "version": "0.1.15",
+  "version": "0.2.0",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",
@@ -26,7 +26,8 @@
   ],
   "activationEvents": [
     "onLanguage:latex",
-    "onLanguage:tex"
+    "onLanguage:tex",
+    "onWebviewPanel:latexReview.visual"
   ],
   "capabilities": {
     "untrustedWorkspaces": {
@@ -35,6 +36,12 @@
   },
   "contributes": {
     "commands": [
+      {
+        "command": "latexReview.openVisualEditor",
+        "title": "Open Visual Editor",
+        "category": "LaTeX Review",
+        "icon": "$(book)"
+      },
       {
         "command": "latexReview.updateBibliography",
         "title": "Update Bibliography from Zotero",
@@ -192,6 +199,12 @@
         "key": "ctrl+alt+m",
         "mac": "cmd+alt+m",
         "when": "editorTextFocus && editorLangId =~ /^(latex|tex)$/"
+      },
+      {
+        "command": "latexReview.openVisualEditor",
+        "key": "ctrl+alt+v",
+        "mac": "cmd+alt+v",
+        "when": "editorLangId =~ /^(latex|tex)$/"
       }
     ],
     "viewsContainers": {
@@ -223,6 +236,11 @@
           "command": "latexReview.showSource",
           "when": "editorLangId =~ /^(latex|tex)$/ && latexReview.livePreview",
           "group": "navigation@50"
+        },
+        {
+          "command": "latexReview.openVisualEditor",
+          "when": "editorLangId =~ /^(latex|tex)$/",
+          "group": "navigation@51"
         }
       ],
       "editor/context": [
@@ -435,6 +453,11 @@
           "type": "string",
           "default": "http://127.0.0.1:23119",
           "description": "Address of Zotero's local server."
+        },
+        "latexReview.visual.followCursor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Visual editor: scroll to the place of the cursor in the source, and scroll the source to the place you edit."
         }
       }
     },
@@ -514,15 +537,17 @@
     ]
   },
   "scripts": {
-    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=dist/extension.js",
-    "check": "tsc -p . && vitest run",
-    "package": "npm run check && npm run build -- --minify && vsce package --no-dependencies --allow-missing-repository"
+    "build": "node scripts/build.mjs",
+    "check": "tsc -p . && tsc -p tsconfig.web.json && vitest run",
+    "package": "npm run check && node scripts/build.mjs --minify && vsce package --no-dependencies --allow-missing-repository"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/vscode": "1.97.0",
     "@vscode/vsce": "^4.1.0",
     "esbuild": "^0.28.2",
+    "katex": "^0.19.1",
+    "pdfjs-dist": "^6.5.438",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   },

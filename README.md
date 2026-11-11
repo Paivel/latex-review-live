@@ -45,6 +45,19 @@ The preamble and anything after `\end{document}` are read-only in live preview (
 
 Code stays hidden while you type, as in Word: a click next to a command puts the cursor inside its braces, so you type its argument (a caption, a label) at once. The cursor steps over hidden code in one go, and typing or deleting cannot cut into it. Set `latexReview.livePreview.reveal` to `element` to see the code of the command the cursor is in, as in Obsidian, or to `line`. `latexReview.livePreview.reveal` switches this to the whole line, or off. The preamble and commands it does not know are left as source. Display math is coloured and its symbols replaced, but it is not typeset.
 
+## Visual editor
+
+**LaTeX Review: Open Visual Editor** (Cmd+Alt+V, or the book button in the editor title bar) opens the document in a tab beside the source, drawn like the PDF, where you edit it directly:
+
+- Paragraphs and headings are typed like in a word processor. Enter starts a new paragraph, Backspace at the start of one joins it to the one before, Cmd+B and Cmd+I make bold and italic.
+- Equations are drawn with KaTeX (with mhchem's `\ce`); click one to edit its source with a live preview.
+- `\cite`, `\ref` and compound labels show their numbers from the last build (the `.aux`). Click one, or any other command shown in purple, to edit its source.
+- Figures show their picture (`\includegraphics`, or the PDF beside an `\input` drawing), with the caption and the label editable under it; a missing caption or label is added when you type one. Double-click the picture to edit the drawing in Reactio Draw.
+- Tracked changes are shown in blue (added) and red (deleted); click one for Accept or Reject.
+- The preamble, lists and anything else that is not drawn stay as editable source in grey boxes.
+
+Every edit goes straight into the `.tex`; the source and the visual editor scroll to each other.
+
 ## Bibliography from Zotero
 
 Insert citations with any picker (for example Citation Picker for Zotero, set to `format=latex`). When a `\cite{key}` is not in the `.bib` file named by `\bibliography{refs}` or `\addbibresource{refs.bib}`, the extension asks Zotero for it through Better BibTeX and appends the entry (the file is created if needed). It runs on save and about a second after the set of cited keys changes. Zotero with Better BibTeX must be running. Run **LaTeX Review: Update Bibliography from Zotero** to do it by hand.

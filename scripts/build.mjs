@@ -1,0 +1,15 @@
+import { build } from "esbuild";
+import fs from "node:fs";
+const minify = process.argv.includes("--minify");
+const copy = (from, to) => { fs.mkdirSync(to.replace(/\/[^/]*$/, ""), { recursive: true }); fs.copyFileSync(from, to); };
+await build({ entryPoints: ["src/extension.ts"], bundle: true, platform: "node", format: "cjs", target: "node20", external: ["vscode"], outfile: "dist/extension.js", minify });
+await build({ entryPoints: ["src/visual/web/main.ts"], bundle: true, platform: "browser", format: "iife", target: "chrome120", outfile: "dist/visual.js", minify });
+copy("src/visual/web/visual.css", "dist/visual.css");
+const k = "node_modules/katex/dist";
+copy(`${k}/katex.min.js`, "dist/katex/katex.min.js");
+copy(`${k}/katex.min.css`, "dist/katex/katex.min.css");
+copy(`${k}/contrib/mhchem.min.js`, "dist/katex/mhchem.min.js");
+copy("node_modules/katex/LICENSE", "dist/katex/LICENSE");
+for (const f of fs.readdirSync(`${k}/fonts`)) if (f.endsWith(".woff2")) copy(`${k}/fonts/${f}`, `dist/katex/fonts/${f}`);
+for (const f of ["pdf.min.mjs", "pdf.worker.min.mjs"]) copy(`node_modules/pdfjs-dist/build/${f}`, `dist/pdfjs/${f}`);
+copy("node_modules/pdfjs-dist/LICENSE", "dist/pdfjs/LICENSE");

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- Visual editor (Cmd+Alt+V, or the book button above a .tex file): the document drawn like the PDF in a tab beside the source, and edited there. Paragraphs, headings, bold and italic are typed in place; equations are drawn with KaTeX and edited by clicking; \cite, \ref and compound numbers show their numbers from the last build; figures show their picture (PDF, PNG, JPG, SVG) with the caption and label editable under it. Double-click a figure to edit its drawing in Reactio Draw. Tracked changes show in blue and red, with Accept and Reject on click. The source and the visual editor follow each other.
+
 ## 0.1.15
 
 - Bibliography from Zotero: a \cite key that is missing from the .bib named by \bibliography or \addbibresource is fetched from Zotero (Better BibTeX) and appended. Runs on save and shortly after you add a citation; also "LaTeX Review: Update Bibliography from Zotero".
