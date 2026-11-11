@@ -13,7 +13,7 @@ html, body { margin: 0; padding: 0; background: var(--vscode-editor-background, 
 .region { outline: none; caret-color: #000; }
 .region:focus { background: #f6f8ff; box-shadow: 0 0 0 3px #f6f8ff; }
 p { margin: 0 0 .9em; text-align: justify; hyphens: auto; }
-.para + .para p { text-indent: 1.5em; }
+:is(.para, .deleted) + :is(.para, .deleted) p { text-indent: 1.5em; }
 h1, h2, h3, h4 { font-weight: 700; margin: 1.3em 0 .5em; line-height: 1.25; }
 h1 { font-size: 1.4em; } h2 { font-size: 1.2em; } h3 { font-size: 1.05em; } h4 { font-size: 1em; display: inline; }
 .num { margin-right: .7em; user-select: none; }

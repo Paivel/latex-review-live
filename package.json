@@ -2,7 +2,7 @@
   "name": "latex-review-live",
   "displayName": "LaTeX Review and Visual Editor",
   "description": "Track changes with accept/reject, review comments, and a visual editor that shows the document like the PDF and lets you edit it there.",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publisher": "paivel",
   "license": "Apache-2.0",
   "icon": "images/icon.png",

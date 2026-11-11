@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3
+
+- Visual editor: a deleted paragraph and the paragraph after it keep their first-line indent.
+
 ## 0.3.2
 
 - Visual editor: a deleted paragraph (tracked) is shown struck through where it was, with Accept and Reject on click.
