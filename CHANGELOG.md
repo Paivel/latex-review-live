@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.5
+
+- Visual editor: clicking a compound label on a picture copies its \rcmpd{..} at once; the box that opens keeps Insert.
+
 ## 0.3.4
 
 - Visual editor: formulas use the macros the preamble defines (\newcommand, \renewcommand, \providecommand, \DeclareMathOperator, \def); drawn formulas are cached, so long documents redraw fast.

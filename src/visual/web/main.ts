@@ -174,7 +174,7 @@ function renderBlock(b: VBlock): HTMLElement {
             const refs = [...l.tex.matchAll(/\\(?:r?cmpd|refcmpd|cmpdplain)\*?(?:\[[^\]]*\])*\{[^{}]*\}/g)].map((x) => x[0]);
             if (refs.length) {
               t.classList.add("ref");
-              t.title = `${refs.join(", ")}: click to copy or insert into the text`;
+              t.title = `${refs.join(", ")}: click to copy`;
               t.addEventListener("mousedown", (e) => e.preventDefault()); // keep the caret in the text
               t.addEventListener("dblclick", (e) => e.stopPropagation());
               t.addEventListener("click", (e) => { e.stopPropagation(); labelPop(t, refs); });
@@ -822,15 +822,16 @@ function copyText(v: string) {
   });
 }
 
-/** A compound label on a picture: copy its LaTeX, or put it at the caret. */
+/** A compound label on a picture: its LaTeX is copied on click, and can be put at the caret. */
 function labelPop(target: HTMLElement, refs: string[]) {
   closePop();
+  // A click copies the label at once; the box offers to insert it at the caret.
+  copyText(refs.join(" "));
   pop = el("div", "pop labels");
+  pop.appendChild(el("div", "hint", "Copied"));
   for (const ref of refs) {
     const row = el("div", "lrow");
     row.appendChild(el("code", "", ref));
-    const copy = el("button", "plain", "Copy");
-    copy.addEventListener("click", () => { copyText(ref); copy.textContent = "Copied"; setTimeout(closePop, 600); });
     const ins = el("button", "ok", "Insert");
     ins.disabled = !lastCaret || !lastCaret.startContainer.isConnected;
     ins.title = ins.disabled ? "Click in the text first" : "Insert at the caret";
@@ -847,7 +848,7 @@ function labelPop(target: HTMLElement, refs: string[]) {
       clearTimeout(timers.get(region));
       flush(region);
     });
-    row.append(copy, ins);
+    row.append(ins);
     pop.appendChild(row);
   }
   document.body.appendChild(pop);
