@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.5
+
+- Visual editor: a click beside the text (right of a list item, caption or title, or on an empty list item) puts the caret at the end of that line.
+
 ## 0.5.4
 
 - PDF view: pictures are found on pdfTeX's pages (the n-th included PDF on the pages is the n-th PDF picture of the document, sized from the file itself); before, none were found because pdf.js does not pass the box of TeX's form XObjects.

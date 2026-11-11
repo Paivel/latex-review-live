@@ -150,3 +150,5 @@ canvas.pdfpage { background: #fff; box-shadow: 0 2px 14px #0005; cursor: text; }
 .figspot:hover { outline: 1px dashed #2a62c988; }
 .spotlabel, .spotlabel * { color: transparent !important; }
 .spotlabel:hover { background: #2a62c922; }
+/* An empty list item still has a line to click in. */
+.itemtext.region:empty { display: inline-block; min-width: 4em; min-height: 1em; }

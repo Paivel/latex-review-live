@@ -1359,3 +1359,47 @@ document.addEventListener("mousedown", (e) => {
 try { if (vscode.getState()?.pdfMode) setTimeout(() => setPdfMode(true), 0); } catch { /* no state */ }
 
 vscode.postMessage({ type: "ready" });
+
+// A click beside the text (right of a short line, on an empty list item) puts the caret at the end of that line,
+// as in a word processor; only a click on the text itself places it inside.
+page.addEventListener("mousedown", (ev) => {
+  if (ev.button !== 0 || ev.detail > 1) return;
+  const t = ev.target as HTMLElement;
+  if (t.closest(".region, .atom, button, input, textarea, a, .pop, .pic, .eq, .plabel, details, .srctoggle")) return;
+  const host = t.closest<HTMLElement>("li, .vitem, .block");
+  if (!host || !page.contains(host)) return;
+  // The regions of this line's own element (not of nested lists).
+  const regions = [...host.querySelectorAll<HTMLElement>(".region")].filter((r) => r.closest("li, .vitem, .block") === host && r.isContentEditable && !r.hidden);
+  if (!regions.length) return;
+  const y = ev.clientY;
+  let best: { r: HTMLElement; rect: DOMRect | null; d: number } | null = null;
+  for (const r of regions) {
+    const rects = [...r.getClientRects()];
+    if (!rects.length) { const b = r.getBoundingClientRect(); const d = Math.abs((b.top + b.bottom) / 2 - y); if (!best || d < best.d) best = { r, rect: null, d }; continue; }
+    for (const rc of rects) {
+      const d = y < rc.top ? rc.top - y : y > rc.bottom ? y - rc.bottom : 0;
+      if (!best || d < best.d) best = { r, rect: rc, d };
+    }
+  }
+  if (!best || best.d > 40) return;
+  ev.preventDefault();
+  best.r.focus();
+  const sel = getSelection();
+  if (!sel) return;
+  let range: Range | null = null;
+  if (best.rect) {
+    // The end of the visual line under the click (or its start, for a click left of the text).
+    const left = ev.clientX < best.rect.left;
+    const x = left ? best.rect.left + 1 : best.rect.right - 1;
+    const yy = Math.min(Math.max(y, best.rect.top + 1), best.rect.bottom - 1);
+    range = (document as any).caretRangeFromPoint?.(x, yy) ?? null;
+    if (range && !best.r.contains(range.startContainer)) range = null;
+  }
+  if (!range) {
+    range = document.createRange();
+    range.selectNodeContents(best.r);
+    range.collapse(false);
+  }
+  sel.removeAllRanges();
+  sel.addRange(range);
+});
