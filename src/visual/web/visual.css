@@ -118,3 +118,17 @@ details.cmt summary::-webkit-details-marker { display: none; }
 .docaffil { font-style: italic; font-size: .95em; margin-bottom: .2em; }
 .docemail { font-size: .95em; margin: .5em 0 .4em; }
 .fmt.textsf { font-family: Helvetica, Arial, sans-serif; font-size: .95em; }
+.amark { font-size: .7em; vertical-align: super; line-height: 0; margin-left: 1px; }
+.docaffil .amark { vertical-align: baseline; font-size: 1em; font-style: normal; margin-right: 1px; }
+.docphone { font-size: .95em; }
+.texlogo { white-space: nowrap; }
+.texlogo .la { font-size: .75em; vertical-align: .28em; margin: 0 -.32em 0 -.3em; }
+.texlogo .le { position: relative; top: .22em; margin: 0 -.12em 0 -.16em; }
+.fmt.texttt { color: inherit; background: none; padding: 0; }
+/* achemso: sans-serif title and authors, as the class sets them */
+#page[data-cls="achemso"] :is(.doctitle, .docauthor, .docemail) { font-family: Helvetica, Arial, sans-serif; }
+#page[data-cls="achemso"] .doctitle { font-size: 1.6em; }
+#page[data-cls="achemso"] .docauthor { font-size: 1.05em; line-height: 1.9; }
+/* tocentry: one frame around all its paragraphs */
+.in-tocentry { border-radius: 0; }
+.in-tocentry.para p { margin: 0; padding-bottom: .5em; }

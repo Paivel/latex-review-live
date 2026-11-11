@@ -64,7 +64,17 @@ export interface VBlock {
   /** list: its items. */
   list?: VList;
   /** code block with \maketitle: the title, authors and date from the preamble. */
-  titleBlock?: { title: VText | null; authors: VText[]; date: VText | null; affiliations: VText[]; emails: string[] };
+  titleBlock?: {
+    title: VText | null;
+    authors: VText[];
+    /** achemso: "*,‡" after each author. */
+    authorMarks: string[];
+    date: VText | null;
+    affiliations: { text: VText; mark: string }[];
+    emails: string[];
+    phone?: string;
+    fax?: string;
+  };
   /** The \begin / \end line of an open environment (abstract, acknowledgement...): drawn as its heading, or not at all. */
   wrap?: { env: string; side: "begin" | "end"; title: string };
   /** The innermost open environment the block sits in. */
@@ -96,6 +106,8 @@ export interface VDoc {
   version: number;
   name: string;
   superCites: boolean;
+  /** \documentclass name. */
+  docClass: string;
   /** Body font size of the document in pt (10, 11 or 12). */
   fontPt: number;
   /** The preamble's own commands, for KaTeX. */
@@ -196,17 +208,58 @@ export function buildDoc(inp: BuildInput): VDoc {
   const vlist = (l: ListInfo): VList => ({ env: l.env, items: l.items.map((it) => ({ text: vtext(it.text)!, label: vtext(it.label), sub: it.sub.map(vlist) })) });
   const thmCount: Record<string, number> = {};
   const titleOf = (to: number): NonNullable<VBlock["titleBlock"]> => {
-    const affiliations: VText[] = [];
-    for (const name of ["affiliation", "alsoaffiliation", "altaffiliation"]) {
-      for (const r of commandArgs(text, name, 0, to)) if (!affiliations.some((a) => a.src === text.slice(r.start, r.end))) affiliations.push(vtext(r)!);
+    // Read the meta-data in order, as achemso does: \affiliation goes to every earlier author without one,
+    // \alsoaffiliation, \altaffiliation and \email to the author just before.
+    type A = { r: VText; aff: string[]; alt: string[]; star: boolean };
+    const authors: A[] = [];
+    const affs = new Map<string, { text: VText; alt: boolean }>();
+    let phone: string | undefined;
+    let fax: string | undefined;
+    const emails: string[] = [];
+    const re = /\\(author|affiliation|alsoaffiliation|altaffiliation|email|phone|fax)\s*(?:\[[^\]]*\]\s*)?\{/g;
+    for (let m = re.exec(text); m && m.index < to; m = re.exec(text)) {
+      const r = commandArg(text, m[1], m.index, to);
+      if (!r || r.start !== m.index + m[0].length) continue;
+      const src = text.slice(r.start, r.end);
+      const key = src.replace(/\s+/g, " ").trim();
+      const last = authors[authors.length - 1];
+      switch (m[1]) {
+        case "author": authors.push({ r: vtext(r)!, aff: [], alt: [], star: false }); break;
+        case "affiliation":
+          if (!affs.has(key)) affs.set(key, { text: vtext(r)!, alt: false });
+          for (const a of authors) if (!a.aff.length) a.aff.push(key);
+          break;
+        case "alsoaffiliation":
+          if (!affs.has(key)) affs.set(key, { text: vtext(r)!, alt: false });
+          if (last && !last.aff.includes(key)) last.aff.push(key);
+          break;
+        case "altaffiliation":
+          if (!affs.has(key)) affs.set(key, { text: vtext(r)!, alt: true });
+          if (last && !last.alt.includes(key)) last.alt.push(key);
+          break;
+        case "email": emails.push(key); if (last) last.star = true; break;
+        case "phone": phone = key; break;
+        case "fax": fax = key; break;
+      }
+      re.lastIndex = r.end;
     }
-    affiliations.sort((a, b) => a.start - b.start);
+    // Affiliations first, then the other notes; each gets the next footnote symbol († is the title's).
+    const order = [...affs.entries()].filter(([, v]) => !v.alt).concat([...affs.entries()].filter(([, v]) => v.alt));
+    const SYMBOLS = ["\u2021", "\u00b6", "\u00a7", "\u2016", "\u22a5", "#", "\u25b3", "\u2207", "\u25bd"];
+    const marked = order.length > 1 || order.some(([, v]) => v.alt);
+    const sym = new Map(order.map(([k], i) => [k, marked ? SYMBOLS[i] ?? String(i + 1) : ""]));
     return {
       title: vtext(commandArg(text, "title", 0, to)),
-      authors: commandArgs(text, "author", 0, to).map((r) => vtext(r)!),
+      authors: authors.map((a) => a.r),
+      authorMarks: authors.map((a) => {
+        const idx = [...a.aff, ...a.alt].map((k) => order.findIndex(([x]) => x === k)).sort((x, y) => x - y);
+        return [...(a.star && authors.length > 1 ? ["*"] : []), ...idx.map((i) => sym.get(order[i][0]) ?? "")].filter(Boolean).join(",");
+      }),
       date: vtext(commandArg(text, "date", 0, to)),
-      affiliations,
-      emails: commandArgs(text, "email", 0, to).map((r) => text.slice(r.start, r.end).trim()),
+      affiliations: order.map(([k, v]) => ({ text: v.text, mark: sym.get(k) ?? "" })),
+      emails,
+      phone,
+      fax,
     };
   };
   const WRAP_TITLES: Record<string, string> = {
@@ -319,6 +372,7 @@ export function buildDoc(inp: BuildInput): VDoc {
     uri: inp.uri,
     version: inp.version,
     name: inp.name,
+    docClass: cls?.[2].trim() ?? "",
     superCites: !!(natbib && /\bsuper\b/.test(natbib[1])) || achemso,
     fontPt,
     // mhchem's \ce is KaTeX's own; a preamble stand-in for it would hide it.

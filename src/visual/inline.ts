@@ -24,6 +24,8 @@ const CITE = /^(?:[a-zA-Z]*cite[a-zA-Z]*|nocite)$/;
 const REF = /^(?:ref|eqref|cref|Cref|autoref|pageref|vref|nameref)$/;
 const CMPD = /^(?:cmpd|rcmpd|refcmpd|cmpdplain)$/;
 const ESCAPABLE = "%&_#${}";
+/** TeX accent commands and the combining marks they stand for. */
+const ACCENTS: Record<string, string> = { '"': "\u0308", "'": "\u0301", "`": "\u0300", "^": "\u0302", "~": "\u0303", "=": "\u0304", ".": "\u0307" };
 const LIGATURES: Record<string, string> = { "---": "\u2014", "--": "\u2013", "``": "\u201c", "''": "\u201d" };
 
 export interface Lookup {
@@ -106,6 +108,18 @@ export function tokenize(s: string, look: Lookup = {}, base = 0): Inline[] {
       if (n === "[") {
         const e = s.indexOf("\\]", i + 2);
         if (e >= 0) { atom({ t: "atom", src: s.slice(i, e + 2), kind: "math", tex: "\\displaystyle " + s.slice(i + 2, e) }); i = e + 2; continue; }
+      }
+      if (ACCENTS[n] !== undefined) {
+        // \"o, \'{e}, \^a: the accented letter, as one atom.
+        let e = i + 2;
+        let letter = "";
+        if (s[e] === "{") { const g = groupEnd(s, e); if (g > 0) { letter = s.slice(e + 1, g - 1).replace(/^\\/, ""); e = g; } }
+        else if (/[a-zA-Z]/.test(s[e] ?? "")) { letter = s[e]; e++; }
+        if (letter.length === 1) {
+          atom({ t: "atom", src: s.slice(i, e), kind: "space", show: ((letter === "i" ? "\u0131" : letter) + ACCENTS[n]).normalize("NFC") });
+          i = e;
+          continue;
+        }
       }
       if (!/[a-zA-Z@]/.test(n)) {
         // Control symbols: \, \; \  \- \' etc.

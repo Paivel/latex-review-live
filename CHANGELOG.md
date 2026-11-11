@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.3
+
+- Visual editor, achemso: authors carry their footnote marks (* for an e-mail, ‡ ¶ § for affiliations, ‖ ⊥ for other notes) assigned the way the class does; affiliations are listed with their marks; phone and fax are shown; title and authors are sans-serif.
+- Visual editor: accents (\\"o, \\'{e}, \\^a...) show as the letter; \\LaTeX, \\TeX and \\LaTeXe draw as logos; footnote marks are superscript; \\texttt no longer takes the editor's code colour; the tocentry frame is one box.
+
 ## 0.4.2
 
 - Visual editor: achemso documents get their title block without \maketitle: title, every \author, affiliations and e-mails.

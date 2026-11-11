@@ -128,7 +128,9 @@ describe("achemso", () => {
     const t = d.blocks.find((b) => b.virtual)!.titleBlock!;
     expect(t.title!.src).toContain("A demo");
     expect(t.authors.map((a) => a.src)).toEqual(["Andrew Other", "Ken Leader"]);
-    expect(t.affiliations.map((a) => a.src)).toEqual(["Dept, Unknown University", "Second University"]);
+    expect(t.affiliations.map((a) => [a.mark, a.text.src])).toEqual([["\u2021", "Dept, Unknown University"], ["\u00b6", "Second University"]]);
+    // \affiliation goes to both earlier authors; \alsoaffiliation and \email to the last one.
+    expect(t.authorMarks).toEqual(["\u2021", "*,\u00b6"]);
     expect(t.emails).toEqual(["k@u.uu"]);
   });
   it("splits open environments into blocks and folds comments", () => {

@@ -91,8 +91,21 @@ function drawAtom(a: HTMLElement, kind: string, show: string | undefined, tex: s
     if (doc?.superCites) a.appendChild(el("sup", "", show ?? "?"));
     else a.textContent = `[${show ?? "?"}]`;
   } else if (kind === "comment") { a.textContent = "%"; a.title = src; }
+  else if (show === "\u2020" && /^\\(footnote|bibnote|thanks)\b/.test(src)) { a.appendChild(el("sup", "", "\u2020")); a.title = src; }
+  else if (show === "LaTeX" || show === "LaTeX2\u03b5" || show === "TeX") texLogo(a, show);
   else a.textContent = show ?? src;
   if (kind === "cmd" && show === src) a.classList.add("raw");
+}
+
+/** The TeX and LaTeX logos with their lowered E and raised A. */
+function texLogo(a: HTMLElement, name: string) {
+  const logo = el("span", "texlogo");
+  if (name.startsWith("La")) { logo.appendChild(document.createTextNode("L")); logo.appendChild(el("span", "la", "A")); }
+  logo.appendChild(document.createTextNode("T"));
+  logo.appendChild(el("span", "le", "E"));
+  logo.appendChild(document.createTextNode("X"));
+  a.appendChild(logo);
+  if (name.endsWith("\u03b5")) a.appendChild(document.createTextNode("\u20092\u03b5"));
 }
 
 function editable(e: HTMLElement, start: number, end: number, src: string, kind: string) {
@@ -355,13 +368,22 @@ function renderTitle(box: HTMLElement, b: VBlock) {
     // One \author per person (achemso, revtex): "A, B and C"; one \author with \and: as written.
     const row = el("div", "docauthor");
     t.authors.forEach((a, k) => {
-      if (k > 0) row.appendChild(document.createTextNode(k === t.authors.length - 1 ? (t.authors.length > 2 ? ", and " : " and ") : ", "));
+      // achemso writes "A, B and C"; the others here keep the serial comma.
+      const serial = t.authors.length > 2 && doc?.docClass !== "achemso";
+      if (k > 0) row.appendChild(document.createTextNode(k === t.authors.length - 1 ? (serial ? ", and " : " and ") : ", "));
       row.appendChild(textRegion("span", "author", a, b));
+      if (t.authorMarks[k]) row.appendChild(el("sup", "amark", t.authorMarks[k]));
     });
     tb.appendChild(row);
   }
-  for (const a of t.affiliations) tb.appendChild(textRegion("div", "docaffil", a, b));
+  for (const a of t.affiliations) {
+    const row = el("div", "docaffil");
+    if (a.mark) row.appendChild(el("span", "amark", a.mark));
+    row.appendChild(textRegion("span", "", a.text, b));
+    tb.appendChild(row);
+  }
   if (t.emails.length) tb.appendChild(el("div", "docemail", `E-mail: ${t.emails.join("; ")}`));
+  if (t.phone || t.fax) tb.appendChild(el("div", "docphone", [t.phone ? `Phone: ${t.phone}` : "", t.fax ? `Fax: ${t.fax}` : ""].filter(Boolean).join(". ")));
   if (t.date) tb.appendChild(textRegion("div", "docdate", t.date, b));
   box.appendChild(tb);
 }
@@ -452,6 +474,7 @@ const keyOf = new WeakMap<HTMLElement, string>();
 function render(d: VDoc, refresh: boolean) {
   const prevDoc = doc;
   doc = d;
+  page.dataset.cls = d.docClass;
   bar.innerHTML = "";
   bar.appendChild(el("span", "name", d.name));
   const n = d.changes.length;

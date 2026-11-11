@@ -46,3 +46,13 @@ describe("TeX ligatures", () => {
     expect(t.filter((n) => n.t === "atom").map((n) => (n as { show?: string }).show)).toEqual(["–", "—", "“", "”"]);
   });
 });
+
+describe("accents", () => {
+  it("draws \\\"o and \\'{e} as letters", async () => {
+    const { tokenize, serialize } = await import("../src/visual/inline");
+    const s = "Othert\\\"own caf\\'{e}";
+    const t = tokenize(s);
+    expect(serialize(t)).toBe(s);
+    expect(t.filter((n) => n.t === "atom").map((n) => (n as { show?: string }).show)).toEqual(["ö", "é"]);
+  });
+});
