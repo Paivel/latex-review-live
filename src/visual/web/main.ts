@@ -1146,7 +1146,7 @@ window.addEventListener("message", (e) => {
   if (m.type === "pdf") void showPdf(m.data as string);
   if (m.type === "pdfStatus") {
     pdfStatusEl.textContent = m.state === "building" ? "Building…" : m.state === "ok" ? "" : m.state === "error" ? "LaTeX error" : "No latexmk";
-    pdfStatusEl.title = m.text ?? "";
+    pdfStatusEl.title = m.state === "error" ? `${m.text ?? ""}\nClick to open the log.` : m.text ?? "";
     pdfStatusEl.className = `pdfstatus ${m.state}`;
     if (m.state !== "building" && m.state !== "ok" && pdfMode && !pdfView.querySelector("canvas")) pdfView.textContent = m.text;
   }
@@ -1174,6 +1174,8 @@ const pdfView = el("div", "pdfview");
 pdfView.hidden = true;
 document.body.appendChild(pdfView);
 const pdfStatusEl = el("span", "pdfstatus");
+// A failed build: click to read LaTeX's log.
+pdfStatusEl.addEventListener("click", () => { if (/error/.test(pdfStatusEl.className)) vscode.postMessage({ type: "pdfLog" }); });
 let pdfMode = false;
 let overlayAt: number | null = null;
 let overlayTop = 0;

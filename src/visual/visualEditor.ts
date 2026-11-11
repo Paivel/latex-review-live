@@ -26,6 +26,7 @@ type FromPage =
   | { type: "undo"; redo: boolean }
   | { type: "editFigure"; file: string; entry?: string }
   | { type: "pdfMode"; on: boolean }
+  | { type: "pdfLog" }
   | { type: "pdfClick"; page: number; x: number; y: number };
 
 /**
@@ -343,6 +344,16 @@ class Panel {
       }
       case "pdfMode":
         return this.setPdfMode(m.on);
+      case "pdfLog": {
+        if (!this.live) return;
+        const log = vscode.Uri.file(this.live.pdf.replace(/\.pdf$/i, ".log"));
+        const d = await vscode.workspace.openTextDocument(log);
+        const ed = await vscode.window.showTextDocument(d, { viewColumn: vscode.ViewColumn.One });
+        // Jump to the first error.
+        const at = d.getText().search(/^(?:.*\.tex:\d+: |! )/m);
+        if (at >= 0) { const p = d.positionAt(at); ed.selection = new vscode.Selection(p, p); ed.revealRange(new vscode.Range(p, p), vscode.TextEditorRevealType.InCenter); }
+        return;
+      }
       case "pdfClick": {
         const at = await this.live?.where(m.page, m.x, m.y);
         if (!at) return void this.panel.webview.postMessage({ type: "pdfTarget", offset: null });

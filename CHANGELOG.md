@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.3
+
+- PDF view: click "LaTeX error" in the bar to open the build's log at the first error.
+
 ## 0.5.2
 
 - PDF view: pictures work on the real pages too: double-click one to edit the drawing in Reactio Draw, click a compound label (\\rcmpd) on it to copy it. The pictures are found on the page by their own size, so this works for \\includegraphics PDFs and Reactio \\input figures.
