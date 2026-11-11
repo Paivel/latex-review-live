@@ -1201,6 +1201,7 @@ async function showPdf(b64: string) {
   const pdf = await lib.getDocument({ data: bytes, isEvalSupported: false }).promise;
   const width = Math.min(pdfView.clientWidth || 800, 900) - 24;
   const pages: HTMLElement[] = [];
+  const seen = { n: 0 };
   for (let i = 1; i <= pdf.numPages; i++) {
     const pg = await pdf.getPage(i);
     if (gen !== pdfGen) return; // a newer PDF came meanwhile
@@ -1217,7 +1218,7 @@ async function showPdf(b64: string) {
     const wrap = el("div", "pdfpagewrap");
     wrap.style.width = `${width}px`;
     wrap.appendChild(c);
-    try { await figureSpots(lib, pg, pg.getViewport({ scale: css }), wrap); } catch { /* the page still shows */ }
+    try { await figureSpots(lib, pg, pg.getViewport({ scale: css }), wrap, seen); } catch { /* the page still shows */ }
     pages.push(wrap);
   }
   if (gen !== pdfGen) return;
@@ -1230,38 +1231,39 @@ async function showPdf(b64: string) {
 
 /**
  * Pictures on a real page work as on the drawn one: double-click edits the drawing, a compound label copies it.
- * An included PDF is a form XObject whose box is the picture's own page, so it is found by its natural size.
+ * pdfTeX puts each included PDF in as a form XObject, in document order; pdf.js does not hand over the form's box,
+ * so the n-th form on the pages is the n-th PDF picture of the document, and its size is the picture file's own.
  */
-async function figureSpots(lib: any, pg: any, vp: any, wrap: HTMLElement) {
-  const imgs = (doc?.blocks ?? []).flatMap((b) => b.fig?.images ?? []).filter((im) => im.file && im.heightPt);
+async function figureSpots(lib: any, pg: any, vp: any, wrap: HTMLElement, seen: { n: number }) {
+  const imgs = (doc?.blocks ?? []).flatMap((b) => b.fig?.images ?? []).filter((im) => im.file && im.box);
   if (!imgs.length) return;
   const ops = await pg.getOperatorList();
   const O = lib.OPS;
   const mul = (m: number[], n: number[]) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
   let ctm = [1, 0, 0, 1, 0, 0];
   const stack: number[][] = [];
-  const used = new Set<object>();
+  let depth = 0;
   for (let k = 0; k < ops.fnArray.length; k++) {
     const fn = ops.fnArray[k];
     const args = ops.argsArray[k];
     if (fn === O.save) stack.push(ctm);
     else if (fn === O.restore) ctm = stack.pop() ?? ctm;
     else if (fn === O.transform) ctm = mul(ctm, args);
+    else if (fn === O.paintFormXObjectEnd) { ctm = stack.pop() ?? ctm; depth--; }
     else if (fn === O.paintFormXObjectBegin) {
       stack.push(ctm);
-      const [matrix, bbox] = args as [number[] | null, number[]];
-      if (matrix) ctm = mul(ctm, matrix);
-      if (!bbox) continue;
-      const bw = Math.abs(bbox[2] - bbox[0]);
-      const bh = Math.abs(bbox[3] - bbox[1]);
-      const im = imgs.find((x) => !used.has(x) && Math.abs((x.heightPt ?? 0) - bh) < 1 && (!x.widthPt || Math.abs(x.widthPt - bw) < 1));
-      if (!im) continue;
-      used.add(im);
-      // The box's corners on the page, then in CSS pixels.
+      depth++;
+      const [matrix, bbox] = (args ?? []) as [number[] | null, number[] | null];
+      if (matrix && matrix.length === 6) ctm = mul(ctm, Array.from(matrix));
+      if (depth > 1) continue; // a form inside a picture is part of it
+      const im = imgs[seen.n++];
+      if (!im?.box) continue;
+      const bx = bbox && bbox.length === 4 ? Array.from(bbox) : [0, 0, im.box.w, im.box.h];
+      const bw = Math.abs(bx[2] - bx[0]);
+      // The box's corners on the page, then in CSS pixels by the viewport's own matrix.
       const pt = (x: number, y: number) => [ctm[0] * x + ctm[2] * y + ctm[4], ctm[1] * x + ctm[3] * y + ctm[5]];
-      const [x0, y0] = pt(bbox[0], bbox[1]);
-      const [x1, y1] = pt(bbox[2], bbox[3]);
-      // Page points to CSS pixels by the viewport's own matrix (pdf.js's helpers moved between versions).
+      const [x0, y0] = pt(bx[0], bx[1]);
+      const [x1, y1] = pt(bx[2], bx[3]);
       const T = vp.transform as number[];
       const v = (x: number, y: number) => [T[0] * x + T[2] * y + T[4], T[1] * x + T[3] * y + T[5]];
       const r = [...v(x0, y0), ...v(x1, y1)];
@@ -1289,7 +1291,7 @@ async function figureSpots(lib: any, pg: any, vp: any, wrap: HTMLElement) {
         spot.appendChild(t);
       }
       wrap.appendChild(spot);
-    } else if (fn === O.paintFormXObjectEnd) ctm = stack.pop() ?? ctm;
+    }
   }
 }
 

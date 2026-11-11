@@ -201,7 +201,7 @@ class Panel {
             // \includegraphics[width=..] or [scale=..] sets the size as in LaTeX; an \input drawing sizes itself.
             const want = g.kind === "graphics" ? graphicSize(g.options) : {};
             const widthPt = want.pt ?? (size && want.scale ? size.w * want.scale : size?.w);
-            const extra = { file: p, entry, widthPt: want.frac ? undefined : widthPt, heightPt: size?.h, widthFrac: want.frac, labels };
+            const extra = { file: p, entry, widthPt: want.frac ? undefined : widthPt, heightPt: size?.h, widthFrac: want.frac, labels, box: size ? { w: size.w, h: size.h } : undefined };
             // Quick Look and pdftoppm read the PDF; in a folder VS Code does not trust, pdf.js in the page draws it instead.
             if (/\.pdf$/i.test(p) && vscode.workspace.isTrusted) {
               const png = pictureOf(p, path.join(this.storage.fsPath, "pictures"), () => this.schedule(0));

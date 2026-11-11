@@ -31,6 +31,8 @@ export interface VImage {
   heightPt?: number;
   /** Text Reactio Draw sets over the drawing (compound numbers): position as a fraction of the picture, size in pt. */
   labels?: { x: number; y: number; size: number; tex: string; nodes?: MNode[] }[];
+  /** The picture PDF's own page size in pt, however it is scaled in the document (to find it on a built page). */
+  box?: { w: number; h: number };
   /** Picture file, and the figure's .tex for an \\input figure (for Reactio Draw). */
   file?: string;
   entry?: string;

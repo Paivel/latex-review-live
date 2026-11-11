@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.4
+
+- PDF view: pictures are found on pdfTeX's pages (the n-th included PDF on the pages is the n-th PDF picture of the document, sized from the file itself); before, none were found because pdf.js does not pass the box of TeX's form XObjects.
+
 ## 0.5.3
 
 - PDF view: click "LaTeX error" in the bar to open the build's log at the first error.
