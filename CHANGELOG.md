@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.8
+
+- Visual editor: compound numbers on a Reactio drawing inside a `\resizebox` (Reactio Draw 1.15 and later, or a size set from the picture's corner or menu) now shrink and grow with the drawing, as LaTeX sets them. Without a `\resizebox` (Reactio 1.14, or numbers at text size) they keep their size in pt, also as in the PDF.
+
 ## 0.5.7
 
 - Visual editor: drag a picture's corner to resize it; the width is written as a share of the line (`width=0.5\linewidth`, or a `\resizebox` around an `\input` drawing), snapping to ¼, ⅓, ½, ⅔, ¾ and full.

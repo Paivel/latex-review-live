@@ -213,7 +213,8 @@ class Panel {
             const entry = tex && fs.existsSync(tex) ? tex : undefined;
             // A PDF is shown as a PNG the system draws; until it is ready, or if it cannot be drawn, the page tries pdf.js.
             const size = /\.pdf$/i.test(p) ? pdfSize(p) : undefined;
-            const labels = entry ? reactioLabels(entry) : undefined;
+            // A \resizebox around the \input scales the numbers with the drawing too.
+            const labels = entry ? reactioLabels(entry)?.map((l) => (g.resize ? { ...l, scaled: true } : l)) : undefined;
             // \includegraphics[width=..] or [scale=..] sets the size as in LaTeX; an \input drawing sizes itself
             // unless a \resizebox sets it.
             const want = graphicWidth(g);

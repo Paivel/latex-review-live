@@ -216,7 +216,9 @@ function renderBlock(b: VBlock): HTMLElement {
             const t = el("span", "plabel");
             t.style.left = `${l.x * 100}%`;
             t.style.bottom = `${l.y * 100}%`;
-            t.style.fontSize = em(l.size);
+            // Numbers inside a \resizebox shrink with the drawing: a share of the picture's width (cqw), as LaTeX scales them.
+            if (l.scaled && im.box?.w) { pic.style.containerType = "inline-size"; t.style.fontSize = `${(l.size / im.box.w) * 100}cqw`; }
+            else t.style.fontSize = em(l.size);
             renderNodes(t, l.nodes ?? [], 0);
             t.querySelectorAll(".atom").forEach((a) => { (a as HTMLElement).style.pointerEvents = "none"; });
             const refs = [...l.tex.matchAll(/\\(?:r?cmpd|refcmpd|cmpdplain)\*?(?:\[[^\]]*\])*\{[^{}]*\}/g)].map((x) => x[0]);
