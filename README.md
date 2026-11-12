@@ -34,7 +34,7 @@ The review is kept beside the document in `.latex-review/<name>.tex.json`: the t
 - `\cite`, `\ref` and compound labels show their numbers from the last build (the `.aux`). Click one, or any other command shown in purple, to edit its source.
 - Figures show their picture (`\includegraphics`, or the PDF beside an `\input` drawing), with the caption and the label editable under it; a missing caption or label is added when you type one. Double-click the picture to edit the drawing in Reactio Draw.
 - Tracked changes are shown in blue (added) and red (deleted); click one for Accept or Reject.
-- Figures: drag a picture's corner to resize it (written as `width=0.5\linewidth`), right-click it for size, position (`[h]`, `[t]`, `[b]`, `[p]`), one or both columns (`figure*`) and moving up or down, or drag the ⠿ grip beside it to move the whole figure.
+- Figures: drag a picture's corner to resize it (written as `width=0.5\linewidth`), right-click it for size, position (`[h]`, `[t]`, `[b]`, `[p]`), one or both columns (`figure*`) and moving up or down, or drag the picture (or the ⠿ grip beside it) to move the whole figure.
 - The preamble, lists and anything else that is not drawn stay as editable source in grey boxes.
 
 Every edit goes straight into the `.tex`; the source and the visual editor scroll to each other, and double-clicking text shows it in the source.

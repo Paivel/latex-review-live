@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.9
+
+- Visual editor: drag a picture itself to move its figure (a few pixels of movement start the drag, so clicks and double-clicks work as before); the ⠿ grip keeps working and the drag follows the pointer anywhere on the page.
+
 ## 0.5.8
 
 - Visual editor: compound numbers on a Reactio drawing inside a `\resizebox` (Reactio Draw 1.15 and later, or a size set from the picture's corner or menu) now shrink and grow with the drawing, as LaTeX sets them. Without a `\resizebox` (Reactio 1.14, or numbers at text size) they keep their size in pt, also as in the PDF.

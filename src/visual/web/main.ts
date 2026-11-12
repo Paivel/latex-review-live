@@ -197,11 +197,12 @@ function renderBlock(b: VBlock): HTMLElement {
         const em = (pt: number) => `${pt / (doc?.fontPt ?? 10)}em`;
         if (im.widthFrac) pic.style.width = `${Math.min(1, im.widthFrac) * 100}%`;
         else if (im.widthPt) pic.style.width = em(im.widthPt);
-        pic.title = "Double-click to edit the drawing";
+        pic.title = "Double-click to edit the drawing · drag to move · right-click for size and position";
         pic.addEventListener("dblclick", (e) => { e.preventDefault(); vscode.postMessage({ type: "editFigure", file: im.file, entry: im.entry }); });
         pic.dataset.fig = String(f.start);
         pic.addEventListener("contextmenu", (e) => { e.preventDefault(); figMenu(e, pic, f, index); });
         pic.appendChild(resizeGrip(pic, index));
+        dragFromPicture(pic);
         pics.appendChild(pic);
         if (im.pdf) {
           const holder = el("div", "pdf");
@@ -1037,45 +1038,76 @@ function dropTargets(): HTMLElement[] {
   });
 }
 
+/** Moves a float with the pointer: a blue line shows where it lands (before the block under the pointer). */
+function dragFigure(box: HTMLElement, fig: () => number) {
+  const line = el("div", "dropline");
+  line.style.display = "none";
+  document.body.appendChild(line);
+  box.classList.add("moving");
+  document.body.classList.add("figdrag");
+  let target: HTMLElement | null = null;
+  const move = (ev: PointerEvent) => {
+    ev.preventDefault();
+    // Before the first block whose middle is below the pointer.
+    const all = dropTargets();
+    target = all.find((t) => { const r = t.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; }) ?? null;
+    const ref = target ?? all[all.length - 1];
+    if (!ref) return;
+    const r = ref.getBoundingClientRect();
+    const y = target ? r.top - 6 : r.bottom + 4;
+    line.style.left = `${r.left + scrollX}px`;
+    line.style.width = `${r.width}px`;
+    line.style.top = `${y + scrollY}px`;
+    // Next to itself it goes nowhere.
+    line.style.display = target === box || target === box.nextElementSibling || !target ? "none" : "";
+    if (ev.clientY < 40) scrollBy(0, -12);
+    else if (ev.clientY > innerHeight - 40) scrollBy(0, 12);
+  };
+  const up = () => {
+    document.removeEventListener("pointermove", move, true);
+    document.removeEventListener("pointerup", up, true);
+    document.removeEventListener("pointercancel", up, true);
+    line.remove();
+    box.classList.remove("moving");
+    document.body.classList.remove("figdrag");
+    if (target && target !== box && target !== box.nextElementSibling) vscode.postMessage({ type: "figMove", fig: fig(), to: Number(target.dataset.start) });
+  };
+  // On the document, so the drag goes on whatever element is under the pointer.
+  document.addEventListener("pointermove", move, true);
+  document.addEventListener("pointerup", up, true);
+  document.addEventListener("pointercancel", up, true);
+}
+
 function moveGrip(box: HTMLElement, figStart: number): HTMLElement {
   const g = el("span", "movegrip", "⠿");
   g.title = "Drag to move the figure";
   g.dataset.fig = String(figStart);
   g.contentEditable = "false";
   g.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
     e.preventDefault();
-    g.setPointerCapture(e.pointerId);
-    const line = el("div", "dropline");
-    document.body.appendChild(line);
-    box.classList.add("moving");
-    let target: HTMLElement | null = null;
-    const move = (ev: PointerEvent) => {
-      // Before the first block whose middle is below the pointer.
-      const all = dropTargets();
-      target = all.find((t) => { const r = t.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; }) ?? null;
-      const ref = target ?? all[all.length - 1];
-      if (!ref) return;
-      const r = ref.getBoundingClientRect();
-      const y = target ? r.top - 6 : r.bottom + 4;
-      line.style.left = `${r.left + scrollX}px`;
-      line.style.width = `${r.width}px`;
-      line.style.top = `${y + scrollY}px`;
-      // Next to itself it goes nowhere.
-      line.style.display = target === box || target === box.nextElementSibling || !target ? "none" : "";
-      if (ev.clientY < 40) scrollBy(0, -12);
-      else if (ev.clientY > innerHeight - 40) scrollBy(0, 12);
-    };
-    const up = () => {
-      g.removeEventListener("pointermove", move);
-      line.remove();
-      box.classList.remove("moving");
-      if (target && target !== box && target !== box.nextElementSibling) vscode.postMessage({ type: "figMove", fig: Number(g.dataset.fig), to: Number(target.dataset.start) });
-    };
-    g.addEventListener("pointermove", move);
-    g.addEventListener("pointerup", up, { once: true });
-    g.addEventListener("pointercancel", up, { once: true });
+    dragFigure(box, () => Number(g.dataset.fig));
   });
   return g;
+}
+
+/** The picture itself moves the figure too, once the pointer has gone a few pixels (a click or double-click stays one). */
+function dragFromPicture(pic: HTMLElement) {
+  pic.addEventListener("dragstart", (e) => e.preventDefault());
+  pic.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest(".grip, .plabel")) return;
+    const box = pic.closest<HTMLElement>(".block");
+    if (!box) return;
+    const x0 = e.clientX, y0 = e.clientY;
+    const watch = (ev: PointerEvent) => {
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+      stop();
+      dragFigure(box, () => Number(pic.dataset.fig));
+    };
+    const stop = () => { document.removeEventListener("pointermove", watch, true); document.removeEventListener("pointerup", stop, true); };
+    document.addEventListener("pointermove", watch, true);
+    document.addEventListener("pointerup", stop, true);
+  });
 }
 
 function figMenu(e: MouseEvent, pic: HTMLElement, f: NonNullable<VBlock["fig"]>, index: number) {

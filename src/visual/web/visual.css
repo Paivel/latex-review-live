@@ -168,3 +168,5 @@ canvas.pdfpage { background: #fff; box-shadow: 0 2px 14px #0005; cursor: text; }
 .figmenu .row > span { width: 64px; color: #777; }
 .pop .figmenu button.plain.on, .pop.figmenu button.plain.on { background: #3b6fd8; color: #fff; }
 .pop.figmenu button:disabled { opacity: .4; cursor: default; }
+body.figdrag, body.figdrag * { cursor: grabbing !important; user-select: none !important; }
+.pic img { -webkit-user-drag: none; }
