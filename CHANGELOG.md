@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.10
+
+- Track changes: lines are compared first and words only inside rewritten lines, so a block that went away or came in (a figure moved elsewhere, a new paragraph) shows as one deletion or insertion instead of being matched word by word with the lines around it.
+
 ## 0.5.9
 
 - Visual editor: drag a picture itself to move its figure (a few pixels of movement start the drag, so clicks and double-clicks work as before); the ⠿ grip keeps working and the drag follows the pointer anywhere on the page.

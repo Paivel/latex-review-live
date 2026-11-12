@@ -106,3 +106,13 @@ describe("changesBetween (incremental)", () => {
     expect(changesBetween(b, b, segs)).toEqual([]);
   });
 });
+
+describe("whole lines stay whole", () => {
+  it("shows a moved-away float as one deletion, not matched word by word with the text around it", () => {
+    const base = "Files are free.\n\n\\end{suppinfo}\n\\begin{scheme}\n  \\centering\n  \\input{figures/a}\n  \\caption{}\n\\end{scheme}\n%% end\n";
+    const cur = "Files are free.\nnew line\nother \\rcmpd{1}\n\n\\end{suppinfo}\n%% end\n";
+    const ch = computeChanges(base, cur);
+    expect(ch.some((c) => c.deleted.includes("\\begin{scheme}") && c.deleted.includes("\\end{scheme}") && c.inserted === "")).toBe(true);
+    expect(ch.every((c) => !c.deleted.includes("suppinfo"))).toBe(true);
+  });
+});

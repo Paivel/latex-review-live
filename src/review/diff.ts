@@ -1,4 +1,4 @@
-import { diffWordsWithSpace } from "diff";
+import { diffLines, diffWordsWithSpace } from "diff";
 
 /**
  * One tracked change: the text between baseStart..baseEnd of the baseline
@@ -54,42 +54,58 @@ export function computeChanges(base: string, cur: string, timeoutMs = 1500): Cha
   const a = base.slice(pre, base.length - suf);
   const b = cur.slice(pre, cur.length - suf);
 
-  const parts = diffWordsWithSpace(a, b, { timeout: timeoutMs });
-  if (!parts) {
+  // Lines first, then words only inside lines that were rewritten. Whole lines that went or came (a figure moved
+  // elsewhere, a paragraph added) stay one block instead of being matched word by word with their neighbours,
+  // where "\\end{" of one environment would pair with "\\end{" of another.
+  const lines = diffLines(a, b, { timeout: timeoutMs });
+  if (!lines) {
     return [{ baseStart: pre, baseEnd: pre + a.length, curStart: pre, curEnd: pre + b.length, deleted: a, inserted: b }];
   }
-
   const raw: Change[] = [];
   let bi = pre;
   let ci = pre;
+  let del = "";
+  let ins = "";
+  const flush = () => {
+    if (del && ins) {
+      const words = wordChanges(del, ins, bi - del.length, ci - ins.length, timeoutMs);
+      if (words) raw.push(...words);
+      else raw.push({ baseStart: bi - del.length, baseEnd: bi, curStart: ci - ins.length, curEnd: ci, deleted: del, inserted: ins });
+    } else if (del || ins) raw.push({ baseStart: bi - del.length, baseEnd: bi, curStart: ci - ins.length, curEnd: ci, deleted: del, inserted: ins });
+    del = "";
+    ins = "";
+  };
+  for (const p of lines) {
+    if (p.removed) { del += p.value; bi += p.value.length; }
+    else if (p.added) { ins += p.value; ci += p.value.length; }
+    else { flush(); bi += p.value.length; ci += p.value.length; }
+  }
+  flush();
+  return mergeNear(raw, base, cur);
+}
+
+/** Merge changes split by a short run of spaces on the same line. */
+/** Word-level changes between two pieces of text that start at bi (baseline) and ci (current). */
+function wordChanges(a: string, b: string, bi: number, ci: number, timeoutMs: number): Change[] | null {
+  const parts = diffWordsWithSpace(a, b, { timeout: timeoutMs });
+  if (!parts) return null;
+  const raw: Change[] = [];
   let open: Change | undefined;
   for (const p of parts) {
     if (!p.added && !p.removed) {
-      if (open) {
-        raw.push(open);
-        open = undefined;
-      }
+      if (open) { raw.push(open); open = undefined; }
       bi += p.value.length;
       ci += p.value.length;
       continue;
     }
     if (!open) open = { baseStart: bi, baseEnd: bi, curStart: ci, curEnd: ci, deleted: "", inserted: "" };
-    if (p.removed) {
-      open.deleted += p.value;
-      bi += p.value.length;
-      open.baseEnd = bi;
-    } else {
-      open.inserted += p.value;
-      ci += p.value.length;
-      open.curEnd = ci;
-    }
+    if (p.removed) { open.deleted += p.value; bi += p.value.length; open.baseEnd = bi; }
+    else { open.inserted += p.value; ci += p.value.length; open.curEnd = ci; }
   }
   if (open) raw.push(open);
-
-  return mergeNear(raw, base, cur);
+  return raw;
 }
 
-/** Merge changes split by a short run of spaces on the same line. */
 function mergeNear(raw: Change[], base: string, cur: string): Change[] {
   const merged: Change[] = [];
   for (const c of raw) {
