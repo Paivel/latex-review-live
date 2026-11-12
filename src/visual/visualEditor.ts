@@ -5,7 +5,7 @@ import { applyOwnEdit } from "../own-edits";
 import { ReviewStore } from "../review/review";
 import { readAux } from "../preview/aux";
 import { TEXT_SYMBOLS } from "../preview/symbols";
-import { fieldEdit, figureAt, graphicSize, graphicsPaths, imageCandidates } from "./figure";
+import { fieldEdit, figureAt, graphicWidth, graphicsPaths, imageCandidates, moveEdits, placementEdit, spanEdits, widthEdit } from "./figure";
 import { VDoc, VImage, buildDoc } from "./model";
 import { parseBbl } from "./bbl";
 import { pdfSize, reactioLabels } from "./figureFiles";
@@ -18,6 +18,10 @@ type FromPage =
   | { type: "ready" }
   | { type: "edit"; start: number; end: number; old: string; text: string }
   | { type: "field"; fig: number; which: "caption" | "label"; value: string }
+  | { type: "figWidth"; fig: number; index: number; frac: number }
+  | { type: "figPlace"; fig: number; spec: string }
+  | { type: "figMove"; fig: number; to: number }
+  | { type: "figSpan"; fig: number }
   | { type: "join"; start: number; end: number }
   | { type: "jump"; offset: number; length: number }
   | { type: "reveal"; offset: number }
@@ -210,8 +214,9 @@ class Panel {
             // A PDF is shown as a PNG the system draws; until it is ready, or if it cannot be drawn, the page tries pdf.js.
             const size = /\.pdf$/i.test(p) ? pdfSize(p) : undefined;
             const labels = entry ? reactioLabels(entry) : undefined;
-            // \includegraphics[width=..] or [scale=..] sets the size as in LaTeX; an \input drawing sizes itself.
-            const want = g.kind === "graphics" ? graphicSize(g.options) : {};
+            // \includegraphics[width=..] or [scale=..] sets the size as in LaTeX; an \input drawing sizes itself
+            // unless a \resizebox sets it.
+            const want = graphicWidth(g);
             const widthPt = want.pt ?? (size && want.scale ? size.w * want.scale : size?.w);
             const extra = { file: p, entry, widthPt: want.frac ? undefined : widthPt, heightPt: size?.h, widthFrac: want.frac, labels, box: size ? { w: size.w, h: size.h } : undefined };
             // Quick Look and pdftoppm read the PDF; in a folder VS Code does not trust, pdf.js in the page draws it instead.
@@ -308,6 +313,30 @@ class Panel {
         const e = fieldEdit(text, f, m.which, value);
         const edit = new vscode.WorkspaceEdit();
         edit.replace(doc.uri, new vscode.Range(doc.positionAt(e.start), doc.positionAt(e.end)), e.text);
+        await applyOwnEdit(doc.uri, edit);
+        return;
+      }
+      case "figWidth":
+      case "figPlace":
+      case "figMove":
+      case "figSpan": {
+        // The figure is found again in the current text by its start; a stale offset redraws instead.
+        const text = doc.getText();
+        const f = figureAt(text, m.fig);
+        if (!f || f.start !== m.fig) return this.schedule(0, true);
+        let edits: { start: number; end: number; text: string }[] | null = null;
+        if (m.type === "figWidth") {
+          const g = f.graphics[m.index];
+          const e = g && Number.isFinite(m.frac) ? widthEdit(text, g, m.frac) : null;
+          edits = e && [e];
+        } else if (m.type === "figPlace") {
+          const e = /^[htbpH!]{0,5}$/.test(m.spec) ? placementEdit(text, f, m.spec) : null;
+          edits = e && [e];
+        } else if (m.type === "figSpan") edits = spanEdits(text, f);
+        else if (Number.isInteger(m.to) && m.to >= 0 && m.to <= text.length) edits = moveEdits(text, f, m.to);
+        if (!edits) return this.schedule(0, true);
+        const edit = new vscode.WorkspaceEdit();
+        for (const e of edits) edit.replace(doc.uri, new vscode.Range(doc.positionAt(e.start), doc.positionAt(e.end)), e.text);
         await applyOwnEdit(doc.uri, edit);
         return;
       }

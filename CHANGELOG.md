@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.7
+
+- Visual editor: drag a picture's corner to resize it; the width is written as a share of the line (`width=0.5\linewidth`, or a `\resizebox` around an `\input` drawing), snapping to ¼, ⅓, ½, ⅔, ¾ and full.
+- Right-click a picture for its menu: size, position (`[htbp]`, `[h]`, `[t]`, `[b]`, `[p]`), one or both columns (`figure` ↔ `figure*`), and move up or down.
+- Drag the ⠿ grip beside a figure to move the whole float before another block.
+
 ## 0.5.6
 
 - PDF view: while tracking is on, tracked changes show in the built PDF (insertions coloured, deletions struck through, open comments as notes), with the changes package and every line on its own line so clicks still find the source. Accept and reject rebuild it. Without the changes package installed, the PDF is built without the marks and the status says how to install it.

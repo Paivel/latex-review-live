@@ -187,7 +187,9 @@ function renderBlock(b: VBlock): HTMLElement {
       const f = b.fig!;
       const pics = el("div", "pics");
       if (!f.images.length) pics.appendChild(el("div", "missing", "This figure has no picture."));
-      for (const im of f.images) {
+      // Drag the grip to move the whole float between blocks.
+      box.appendChild(moveGrip(box, f.start));
+      for (const [index, im] of f.images.entries()) {
         if (im.pending) { pics.appendChild(el("div", "missing", `Drawing ${im.name}…`)); continue; }
         if (!im.uri) { pics.appendChild(el("div", "missing", `No picture found for ${im.name}`)); continue; }
         const pic = el("div", "pic");
@@ -197,6 +199,9 @@ function renderBlock(b: VBlock): HTMLElement {
         else if (im.widthPt) pic.style.width = em(im.widthPt);
         pic.title = "Double-click to edit the drawing";
         pic.addEventListener("dblclick", (e) => { e.preventDefault(); vscode.postMessage({ type: "editFigure", file: im.file, entry: im.entry }); });
+        pic.dataset.fig = String(f.start);
+        pic.addEventListener("contextmenu", (e) => { e.preventDefault(); figMenu(e, pic, f, index); });
+        pic.appendChild(resizeGrip(pic, index));
         pics.appendChild(pic);
         if (im.pdf) {
           const holder = el("div", "pdf");
@@ -973,6 +978,142 @@ function openMath(box: HTMLElement) {
 
 let pop: HTMLElement | null = null;
 function closePop() { pop?.remove(); pop = null; }
+
+// ---- Figures: size, placement, both columns, moving ----
+
+/** A share of the line, snapped to round values (¼, ⅓, ½, ⅔, ¾, full) when close, else to 5%. */
+function snapFrac(x: number): number {
+  x = Math.min(1, Math.max(0.1, x));
+  for (const s of [0.25, 1 / 3, 0.5, 2 / 3, 0.75, 1]) if (Math.abs(x - s) < 0.025) return Math.round(s * 100) / 100;
+  return Math.round(x * 20) / 20;
+}
+const fracLabel = (f: number) => (f >= 1 ? "\\linewidth" : `${f}\\linewidth`);
+
+function resizeGrip(pic: HTMLElement, index: number): HTMLElement {
+  const g = el("span", "grip");
+  g.title = "Drag to resize (width as a share of the line)";
+  g.addEventListener("dblclick", (e) => e.stopPropagation());
+  g.addEventListener("click", (e) => e.stopPropagation());
+  g.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const line = pic.parentElement!.clientWidth || 1;
+    const w0 = pic.getBoundingClientRect().width;
+    const x0 = e.clientX;
+    // A centred picture grows on both sides, so the corner follows the pointer.
+    const cs = getComputedStyle(pic);
+    const both = cs.marginLeft === cs.marginRight ? 2 : 1;
+    let frac = snapFrac(w0 / line);
+    const tip = el("span", "sizetip", fracLabel(frac));
+    pic.appendChild(tip);
+    pic.classList.add("sizing");
+    g.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      frac = snapFrac((w0 + both * (ev.clientX - x0)) / line);
+      pic.style.width = `${frac * 100}%`;
+      tip.textContent = fracLabel(frac);
+    };
+    const up = () => {
+      g.removeEventListener("pointermove", move);
+      tip.remove();
+      pic.classList.remove("sizing");
+      if (Math.abs(frac - w0 / line) > 0.004) vscode.postMessage({ type: "figWidth", fig: Number(pic.dataset.fig), index, frac });
+    };
+    g.addEventListener("pointermove", move);
+    g.addEventListener("pointerup", up, { once: true });
+    g.addEventListener("pointercancel", up, { once: true });
+  });
+  return g;
+}
+
+/** Top-level blocks a float may be put before (not the preamble or the drawn title). */
+function dropTargets(): HTMLElement[] {
+  return [...page.children].filter((e): e is HTMLElement => {
+    const b = blockOf.get(e as HTMLElement);
+    // Not inside an abstract or quote (it would land in the environment), not the preamble or the drawn title.
+    return !!b && !b.virtual && !b.within && b.wrap?.side !== "end" && !(e as HTMLElement).querySelector("details");
+  });
+}
+
+function moveGrip(box: HTMLElement, figStart: number): HTMLElement {
+  const g = el("span", "movegrip", "⠿");
+  g.title = "Drag to move the figure";
+  g.dataset.fig = String(figStart);
+  g.contentEditable = "false";
+  g.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    g.setPointerCapture(e.pointerId);
+    const line = el("div", "dropline");
+    document.body.appendChild(line);
+    box.classList.add("moving");
+    let target: HTMLElement | null = null;
+    const move = (ev: PointerEvent) => {
+      // Before the first block whose middle is below the pointer.
+      const all = dropTargets();
+      target = all.find((t) => { const r = t.getBoundingClientRect(); return ev.clientY < r.top + r.height / 2; }) ?? null;
+      const ref = target ?? all[all.length - 1];
+      if (!ref) return;
+      const r = ref.getBoundingClientRect();
+      const y = target ? r.top - 6 : r.bottom + 4;
+      line.style.left = `${r.left + scrollX}px`;
+      line.style.width = `${r.width}px`;
+      line.style.top = `${y + scrollY}px`;
+      // Next to itself it goes nowhere.
+      line.style.display = target === box || target === box.nextElementSibling || !target ? "none" : "";
+      if (ev.clientY < 40) scrollBy(0, -12);
+      else if (ev.clientY > innerHeight - 40) scrollBy(0, 12);
+    };
+    const up = () => {
+      g.removeEventListener("pointermove", move);
+      line.remove();
+      box.classList.remove("moving");
+      if (target && target !== box && target !== box.nextElementSibling) vscode.postMessage({ type: "figMove", fig: Number(g.dataset.fig), to: Number(target.dataset.start) });
+    };
+    g.addEventListener("pointermove", move);
+    g.addEventListener("pointerup", up, { once: true });
+    g.addEventListener("pointercancel", up, { once: true });
+  });
+  return g;
+}
+
+function figMenu(e: MouseEvent, pic: HTMLElement, f: NonNullable<VBlock["fig"]>, index: number) {
+  closePop();
+  const fig = Number(pic.dataset.fig);
+  const send = (m: Record<string, unknown>) => { closePop(); vscode.postMessage({ fig, ...m }); };
+  pop = el("div", "pop figmenu");
+  const row = (title: string) => { const r = el("div", "row"); r.appendChild(el("span", "", title)); pop!.appendChild(r); return r; };
+  const btn = (r: HTMLElement, text: string, tip: string, on: boolean, act: () => void, disabled = false) => {
+    const b = el("button", on ? "plain on" : "plain", text);
+    b.title = tip;
+    b.disabled = disabled;
+    b.addEventListener("click", act);
+    r.appendChild(b);
+  };
+  const size = row("Size");
+  const cur = Math.round((pic.getBoundingClientRect().width / (pic.parentElement!.clientWidth || 1)) * 100) / 100;
+  for (const [t, v] of [["¼", 0.25], ["½", 0.5], ["¾", 0.75], ["Full", 1]] as const) btn(size, t, fracLabel(v), Math.abs(cur - v) < 0.01, () => send({ type: "figWidth", index, frac: v }));
+  if (f.placement !== undefined) {
+    const place = row("Position");
+    const p = f.placement;
+    for (const [t, v, tip] of [["Auto", "htbp", "Wherever it fits (htbp)"], ["Here", "h", "Here if it fits (h)"], ["Top", "t", "Top of a page (t)"], ["Bottom", "b", "Bottom of a page (b)"], ["Page", "p", "On a page of floats (p)"]] as const) {
+      btn(place, t, tip, p.replace("!", "") === v || (v === "htbp" && !p), () => send({ type: "figPlace", spec: v }), !!f.wide && (v === "h" || v === "b"));
+    }
+    const span = row("Columns");
+    btn(span, "One", `${f.env}: one column`, !f.wide, () => send({ type: "figSpan" }), !f.wide);
+    btn(span, "Both", `${f.env}*: across both columns of a two-column document`, !!f.wide, () => send({ type: "figSpan" }), !!f.wide);
+  }
+  const mv = row("Move");
+  const box = pic.closest<HTMLElement>(".block")!;
+  const all = dropTargets();
+  const i = all.indexOf(box);
+  const before = i > 0 ? all[i - 1] : null;
+  const after = i >= 0 && i + 2 < all.length ? all[i + 2] : null;
+  btn(mv, "↑ Up", "Before the block above", false, () => before && send({ type: "figMove", to: Number(before.dataset.start) }), !before);
+  btn(mv, "↓ Down", "After the block below", false, () => after && send({ type: "figMove", to: Number(after.dataset.start) }), !after);
+  document.body.appendChild(pop);
+  pop.style.left = `${Math.max(8, Math.min(e.clientX + scrollX, innerWidth - 320))}px`;
+  pop.style.top = `${e.clientY + scrollY + 4}px`;
+}
 
 function editAtom(a: HTMLElement) {
   closePop();

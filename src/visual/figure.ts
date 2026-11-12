@@ -15,6 +15,38 @@ export interface Graphic {
   path: string;
   /** \includegraphics[..] options, as written. */
   options?: string;
+  /** Offsets of the whole command (\includegraphics[..]{..} or \input{..}). */
+  at?: number;
+  end?: number;
+  /** A \resizebox{0.5\linewidth}{!}{..} around it: offsets of its width argument and the share it gives. */
+  resize?: { start: number; end: number; frac: number };
+}
+
+/** The share of the line a graphic is set at, from its options or a \resizebox around it. */
+export function graphicWidth(g: Graphic): { frac?: number; pt?: number; scale?: number } {
+  if (g.resize) return { frac: g.resize.frac };
+  return g.kind === "graphics" ? graphicSize(g.options) : {};
+}
+
+const fracText = (frac: number) => {
+  const f = Math.round(Math.min(1, Math.max(0.05, frac)) * 100) / 100;
+  return f >= 1 ? "\\linewidth" : `${f}\\linewidth`;
+};
+
+/**
+ * The edit that sets a graphic to a share of the line: width= in \includegraphics (other size options go),
+ * or a \resizebox around an \input drawing (its width argument when there already is one).
+ */
+export function widthEdit(text: string, g: Graphic, frac: number): { start: number; end: number; text: string } | null {
+  if (g.at === undefined || g.end === undefined) return null;
+  const w = fracText(frac);
+  if (g.resize) return { start: g.resize.start, end: g.resize.end, text: w };
+  const cmd = text.slice(g.at, g.end);
+  if (g.kind === "input") return { start: g.at, end: g.end, text: `\\resizebox{${w}}{!}{${cmd}}` };
+  const m = /^(\\includegraphics\*?)\s*(?:\[([^\]]*)\]\s*)?(\{[\s\S]*\})$/.exec(cmd);
+  if (!m) return null;
+  const keep = (m[2] ?? "").split(",").map((o) => o.trim()).filter((o) => o && !/^(width|height|scale|totalheight)\s*=/.test(o));
+  return { start: g.at, end: g.end, text: `${m[1]}[${[`width=${w}`, ...keep].join(",")}]${m[3]}` };
 }
 
 /** The size \includegraphics options ask for: a share of the line (width=0.6\linewidth), a width in pt, or a scale. */
@@ -121,7 +153,16 @@ function describe(text: string, env: string, start: number, bodyStart: number, b
   const graphics: Graphic[] = [];
   for (const m of body.matchAll(/\\(includegraphics\*?|input|include|includepdf)\s*(?:\[([^\]]*)\]\s*)?\{([^}]*)\}/g)) {
     if (commented(text, bodyStart + m.index!)) continue;
-    graphics.push({ kind: m[1].startsWith("include") && m[1] !== "include" ? "graphics" : "input", path: m[3].trim(), options: m[2] });
+    const at = bodyStart + m.index!;
+    const g: Graphic = { kind: m[1].startsWith("include") && m[1] !== "include" ? "graphics" : "input", path: m[3].trim(), options: m[2], at, end: at + m[0].length };
+    // \resizebox{0.8\linewidth}{!}{\input{..}}: the box sets the size.
+    const before = /\\resizebox\*?\s*\{\s*([\d.]*)\s*\\(?:linewidth|textwidth|columnwidth|hsize)\s*\}\s*\{\s*!\s*\}\s*\{\s*$/.exec(text.slice(Math.max(0, at - 120), at));
+    if (before && /^\s*\}/.test(text.slice(g.end!, g.end! + 20))) {
+      const argStart = at - before[0].length + before[0].indexOf("{") + 1;
+      const argEnd = text.indexOf("}", argStart);
+      g.resize = { start: argStart, end: argEnd, frac: before[1] ? Number(before[1]) : 1 };
+    }
+    graphics.push(g);
   }
   return { env, start, end, bodyStart, bodyEnd, graphics, caption: arg(text, bodyStart, bodyEnd, "caption"), label: arg(text, bodyStart, bodyEnd, "label") };
 }
@@ -193,4 +234,57 @@ function guessIndent(text: string, f: FigureInfo): string {
   const body = text.slice(f.bodyStart, f.bodyEnd);
   const m = /\n([ \t]*)\S/.exec(body);
   return m ? m[1] : "  ";
+}
+
+/** The [htbp] after \begin{env}: offsets inside the brackets, or null. */
+export function placementOf(text: string, f: FigureInfo): Field | null {
+  if (f.env === "wrapfigure") return null;
+  const open = text.indexOf("}", f.start) + 1;
+  const m = /^[ \t]*\[([^\]]*)\]/.exec(text.slice(open, f.bodyStart));
+  if (!m) return null;
+  const start = open + m[0].indexOf("[") + 1;
+  return { start, end: start + m[1].length, text: m[1] };
+}
+
+/** The edit that sets a float's placement ("h", "t", "b", "p", "htbp", "H"…). */
+export function placementEdit(text: string, f: FigureInfo, spec: string): { start: number; end: number; text: string } | null {
+  if (f.env === "wrapfigure") return null;
+  const p = placementOf(text, f);
+  if (!spec) return p ? { start: p.start - 1, end: p.end + 1, text: "" } : null;
+  if (p) return { start: p.start, end: p.end, text: spec };
+  const at = text.indexOf("}", f.start) + 1;
+  return { start: at, end: at, text: `[${spec}]` };
+}
+
+/**
+ * Edits that move a whole float to the line at `to` (a block's start): the float leaves with its own lines
+ * and one blank line after it, and arrives followed by a blank line. Null when `to` is inside the float.
+ */
+export function moveEdits(text: string, f: FigureInfo, to: number): { start: number; end: number; text: string }[] | null {
+  const lineStart = (at: number) => text.lastIndexOf("\n", at - 1) + 1;
+  let from = lineStart(f.start);
+  if (text.slice(from, f.start).trim()) from = f.start;
+  let end = f.end;
+  const rest = /^[ \t]*\n(?:[ \t]*\n)?/.exec(text.slice(end));
+  if (rest) end += rest[0].length;
+  const at = lineStart(to);
+  if (at >= from && at <= end) return null;
+  const body = text.slice(from, f.end);
+  return [
+    { start: from, end, text: "" },
+    { start: at, end: at, text: `${body}\n\n` },
+  ];
+}
+
+/** Edits that switch figure ↔ figure* (one column ↔ both columns) in \begin and \end. Null for floats without a starred form. */
+export function spanEdits(text: string, f: FigureInfo): { start: number; end: number; text: string }[] | null {
+  const base = f.env.replace("*", "");
+  if (!["figure", "scheme", "chart", "graph"].includes(base)) return null;
+  const to = f.env.endsWith("*") ? base : `${base}*`;
+  const b = text.indexOf("{", f.start) + 1;
+  const e = text.lastIndexOf("{", f.end) + 1;
+  return [
+    { start: b, end: b + f.env.length, text: to },
+    { start: e, end: e + f.env.length, text: to },
+  ];
 }

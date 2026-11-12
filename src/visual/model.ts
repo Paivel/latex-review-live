@@ -3,6 +3,7 @@ import { Block, MATH_ENVS, headingNumbers, splitBlocks } from "./blocks";
 import { Inline, Lookup, tokenize } from "./inline";
 import { preambleMacros } from "./macros";
 import { ListInfo, commandArg, commandArgs, envBox, inputPaths, onlyCommands, parseList, theoremEnvs } from "./structure";
+import { placementOf } from "./figure";
 
 /** Inline nodes plus track-changes marks. */
 export type MNode =
@@ -58,6 +59,10 @@ export interface VBlock {
     images: VImage[];
     caption: { start: number; end: number; nodes: MNode[] } | null;
     label: { start: number; end: number; text: string } | null;
+    /** The [htbp] placement as written ("" when there is none); undefined for wrapfigure. */
+    placement?: string;
+    /** figure* and the like: across both columns. */
+    wide?: boolean;
   };
   /** math */
   tex?: string;
@@ -328,6 +333,8 @@ export function buildDoc(inp: BuildInput): VDoc {
         images: inp.images(f).map((im) => (im.labels ? { ...im, labels: im.labels.map((l) => ({ ...l, nodes: tokenize(l.tex, look) as MNode[] })) } : im)),
         caption: f.caption ? { start: f.caption.start, end: f.caption.end, nodes: inline(f.caption.start, f.caption.end) } : null,
         label: f.label ? { start: f.label.start, end: f.label.end, text: f.label.text } : null,
+        placement: f.env === "wrapfigure" ? undefined : placementOf(text, f)?.text ?? "",
+        wide: f.env.endsWith("*"),
       };
     } else if (b.kind === "math") {
       const src = vb.src.trim();
